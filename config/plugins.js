@@ -21,14 +21,13 @@ module.exports = ({ env }) => ({
       shadowCRUD: true,
       playgroundAlways: true,
       depthLimit: 10,
-      amountLimit: 200,
+      amountLimit: 100,
       apolloServer: {
-        tracing: true,
+        tracing: false,
       },
     },
   },
   "apollo-sandbox": {
     enabled: true,
-    endpoint: "https://heydoctor-api.onrender.com/graphql",
   },
 });
