@@ -1,0 +1,19 @@
+{
+  "kind": "collectionType",
+  "collectionName": "payment_webhooks",
+  "info": {
+    "singularName": "payment-webhook",
+    "pluralName": "payment-webhooks",
+    "displayName": "payment webhook",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "notification": {
+      "type": "json"
+    }
+  }
+}

@@ -19,10 +19,10 @@ module.exports = {
    * run jobs, or perform some special logic.
    */
   async bootstrap(/*{ strapi }*/) {
-    const serverKeys = await generateDiffieHellmanKeys();
+    // const serverKeys = await generateDiffieHellmanKeys();
 
-    global.serverPrivateKey = serverKeys.privateKey;
-    global.serverPublicKey = serverKeys.publicKey;
+    // global.serverPrivateKey = serverKeys.privateKey;
+    // global.serverPublicKey = serverKeys.publicKey;
 
   },
 };
