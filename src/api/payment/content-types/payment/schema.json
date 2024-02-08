@@ -24,20 +24,23 @@
     "timestamp": {
       "type": "datetime"
     },
-    "status": {
-      "type": "enumeration",
-      "enum": [
-        "pending",
-        "paid",
-        "cancelled",
-        "rejected"
-      ]
-    },
     "doctor": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::doctor.doctor",
       "inversedBy": "payments"
+    },
+    "order": {
+      "type": "biginteger",
+      "required": true,
+      "unique": true
+    },
+    "status": {
+      "type": "string",
+      "required": true
+    },
+    "payment_data": {
+      "type": "json"
     }
   }
 }
