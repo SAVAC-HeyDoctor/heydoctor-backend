@@ -3,55 +3,44 @@ import { auth } from "../middleware/auth.js";
 
 const router = express.Router();
 
-/* --------------------------------------------------
-   GET — OBTENER AGENDA
--------------------------------------------------- */
+// Mock temporal en memoria
+let AGENDA = [];
+
+// GET: listar citas
 router.get("/", auth, async (req, res) => {
-  try {
-    // Más adelante conectaremos a MySQL, PostgreSQL o Mongo
-    res.json({
-      ok: true,
-      agenda: [],
-    });
-  } catch (error) {
-    console.error("Error en GET /agenda:", error);
-    res.status(500).json({ ok: false, msg: "Error en servidor" });
-  }
+  res.json({ ok: true, agenda: AGENDA });
 });
 
-/* --------------------------------------------------
-   POST — CREAR NUEVA CITA
--------------------------------------------------- */
+// POST: crear cita
 router.post("/", auth, async (req, res) => {
-  try {
-    const { paciente, fecha, hora, motivo } = req.body;
+  const newCita = {
+    id: Date.now().toString(),
+    paciente: req.body.paciente,
+    fecha: req.body.fecha,
+    hora: req.body.hora,
+    motivo: req.body.motivo || "",
+  };
 
-    // Validaciones mínimas
-    if (!paciente || !fecha || !hora) {
-      return res.status(400).json({
-        ok: false,
-        msg: "Paciente, fecha y hora son obligatorios",
-      });
-    }
+  AGENDA.push(newCita);
 
-    // Por ahora generamos una cita "fake" hasta conectar BD
-    const nuevaCita = {
-      id: Date.now(),
-      paciente,
-      fecha,
-      hora,
-      motivo: motivo || "",
-    };
+  res.json({ ok: true, cita: newCita });
+});
 
-    res.json({
-      ok: true,
-      msg: "Cita creada correctamente",
-      cita: nuevaCita,
-    });
-  } catch (error) {
-    console.error("Error en POST /agenda:", error);
-    res.status(500).json({ ok: false, msg: "Error creando cita" });
+// PUT: editar cita
+router.put("/:id", auth, async (req, res) => {
+  const { id } = req.params;
+  const idx = AGENDA.findIndex((c) => c.id === id);
+
+  if (idx === -1) {
+    return res.status(404).json({ ok: false, msg: "Cita no encontrada" });
   }
+
+  AGENDA[idx] = {
+    ...AGENDA[idx],
+    ...req.body,
+  };
+
+  res.json({ ok: true, cita: AGENDA[idx] });
 });
 
 export default router;
