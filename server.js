@@ -4,21 +4,23 @@ import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-
 import { db } from "./db.js";
 
+// ======================================
+// CARGAR VARIABLES DE ENTORNO
+// ======================================
 dotenv.config();
 
-// 🔎 Verificación temporal
+// 🔎 Verificación temporal (borrar luego)
 console.log("ONESIGNAL APP ID:", process.env.ONESIGNAL_APP_ID);
 console.log("ONESIGNAL REST KEY:", process.env.ONESIGNAL_REST_API_KEY);
 
 const app = express();
 app.use(express.json());
 
-// ----------------------------------------
-// CORS (Seguro para producción)
-// ----------------------------------------
+// ======================================
+// CORS (AJUSTAR EN PRODUCCIÓN)
+// ======================================
 app.use(
   cors({
     origin: "*", // Cambiar a dominio final en producción
@@ -26,21 +28,18 @@ app.use(
   })
 );
 
-// ----------------------------------------
+// ======================================
 // SERVIR ARCHIVOS ESTÁTICOS
-// ----------------------------------------
+// ======================================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Carpeta /public (firma.png, seal.png)
-app.use("/public", express.static(path.join(__dirname, "public")));
+app.use("/public", express.static(path.join(__dirname, "public"))); // firmas, sellos
+app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // documentos subidos
 
-// Carpeta /uploads (archivos subidos por usuarios)
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// ----------------------------------------
+// ======================================
 // IMPORTAR RUTAS
-// ----------------------------------------
+// ======================================
 import authRouter from "./routes/auth.js";
 import pacientesRouter from "./routes/pacientes.js";
 import agendaRouter from "./routes/agenda.js";
@@ -48,35 +47,35 @@ import configRouter from "./routes/config.js";
 import cie10Router from "./routes/cie10.js";
 import notificationsRouter from "./routes/notifications.js";
 
-// PDF ROUTES
 import pdfCertificateRouter from "./routes/pdfCertificate.js";
 import pdfPrescriptionRouter from "./routes/pdfPrescription.js";
 import pdfInterconsultRouter from "./routes/pdfInterconsult.js";
 
-// ⭐ NUEVA RUTA: AUDITORÍA
+// ⭐ RUTA NUEVA — AUDITORÍA
 import auditoriaRoutes from "./routes/auditoria.js";
 
-// ----------------------------------------
+// ======================================
 // USAR RUTAS
-// ----------------------------------------
+// ======================================
 app.use("/auth", authRouter);
 app.use("/pacientes", pacientesRouter);
 app.use("/agenda", agendaRouter);
 app.use("/config", configRouter);
 app.use("/cie10", cie10Router);
-app.use("/notifications", notificationsRouter);
 
-// PDF (agrupadas bajo /pdf/)
+app.use("/notifications", notificationsRouter); // OneSignal REST
+
+// PDF agrupadas
 app.use("/pdf/certificate", pdfCertificateRouter);
 app.use("/pdf/prescription", pdfPrescriptionRouter);
 app.use("/pdf/interconsult", pdfInterconsultRouter);
 
-// ⭐ RUTA AUDITORÍA
+// Auditoría
 app.use("/auditoria", auditoriaRoutes);
 
-// ----------------------------------------
-// CREAR ADMIN AUTOMÁTICAMENTE SI NO EXISTE
-// ----------------------------------------
+// ======================================
+// CREAR ADMIN SI NO EXISTE
+// ======================================
 async function ensureAdmin() {
   const { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME } = process.env;
 
@@ -104,9 +103,9 @@ async function ensureAdmin() {
   }
 }
 
-// ----------------------------------------
-// INICIAR SERVIDOR
-// ----------------------------------------
+// ======================================
+// LEVANTAR SERVIDOR
+// ======================================
 const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, async () => {
