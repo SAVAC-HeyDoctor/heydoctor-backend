@@ -8,7 +8,10 @@ import { fileURLToPath } from "url";
 import { db } from "./db.js";
 
 dotenv.config();
+
+// 🔎 Verificación temporal
 console.log("ONESIGNAL APP ID:", process.env.ONESIGNAL_APP_ID);
+console.log("ONESIGNAL REST KEY:", process.env.ONESIGNAL_REST_API_KEY);
 
 const app = express();
 app.use(express.json());
