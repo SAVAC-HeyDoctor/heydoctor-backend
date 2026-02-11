@@ -16,7 +16,7 @@ app.use(express.json());
 // =========================
 app.use(
   cors({
-    origin: "*", // Cuando tengas dominio final: https://heydoctor.health
+    origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
@@ -37,8 +37,8 @@ import authRouter from "./routes/auth.js";
 import pacientesRouter from "./routes/pacientes.js";
 import agendaRouter from "./routes/agenda.js";
 import configRouter from "./routes/config.js";
-// ❌ Deshabilitado temporalmente
-// import cie10Router from "./routes/cie.10.js";
+// import cie10Router from "./routes/cie.10.js";  // deshabilitada
+
 import notificationsRouter from "./routes/notifications.js";
 import onesignalRoutes from "./routes/onesignal.js";
 
@@ -55,9 +55,6 @@ app.use("/auth", authRouter);
 app.use("/pacientes", pacientesRouter);
 app.use("/agenda", agendaRouter);
 app.use("/config", configRouter);
-
-// ❌ Deshabilitada temporalmente para evitar error en Railway
-// app.use("/cie10", cie10Router);
 
 app.use("/notifications", notificationsRouter);
 app.use("/notifications/push", onesignalRoutes);
@@ -77,6 +74,7 @@ app.get("/", (req, res) => {
     ok: true,
     service: "heydoctor-backend",
     auth: "POST /auth/login",
+    version: "1.0.0",
   });
 });
 
@@ -107,16 +105,21 @@ app.use((err, req, res, next) => {
 // CREAR TABLA USERS
 // =========================
 async function ensureUsersTable() {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      password_hash VARCHAR(255) NOT NULL,
-      role VARCHAR(50) DEFAULT 'user',
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `);
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'user',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+    console.log("✔ Tabla users lista");
+  } catch (error) {
+    console.error("❌ Error creando tabla users:", error.message);
+  }
 }
 
 // =========================
@@ -126,31 +129,34 @@ async function ensureAdmin() {
   const { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME } = process.env;
 
   if (!ADMIN_EMAIL || !ADMIN_PASSWORD || !ADMIN_NAME) {
-    console.warn("⚠ Variables ADMIN_* faltan en .env");
+    console.warn("⚠ Variables ADMIN_* faltan en Railway");
     return;
   }
 
-  const result = await db.query("SELECT * FROM users WHERE email=$1", [
-    ADMIN_EMAIL,
-  ]);
+  try {
+    const result = await db.query("SELECT * FROM users WHERE email=$1", [ADMIN_EMAIL]);
 
-  if (result.rows.length === 0) {
-    const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    if (result.rows.length === 0) {
+      const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
 
-    await db.query(
-      `INSERT INTO users (name, email, password_hash, role)
-       VALUES ($1, $2, $3, $4)`,
-      [ADMIN_NAME, ADMIN_EMAIL, hash, "admin"]
-    );
+      await db.query(
+        `INSERT INTO users (name, email, password_hash, role)
+         VALUES ($1, $2, $3, $4)`,
+        [ADMIN_NAME, ADMIN_EMAIL, hash, "admin"]
+      );
 
-    console.log("✔ Admin creado automáticamente");
-  } else {
-    console.log("✔ Admin ya existe");
+      console.log("✔ Admin creado automáticamente");
+    } else {
+      console.log("✔ Admin ya existe");
+    }
+  } catch (error) {
+    console.error("❌ Error creando admin:", error.message);
   }
 }
 
 // =========================
-// CONFIGURACIÓN PRODUCCIÓN
+—
+// PRODUCCIÓN
 // =========================
 const PORT = process.env.PORT || 8080;
 
@@ -170,12 +176,12 @@ if (process.env.NODE_ENV === "production") {
 // INICIAR SERVIDOR
 // =========================
 app.listen(PORT, "0.0.0.0", async () => {
-  try {
-    await ensureUsersTable();
-    await ensureAdmin();
-  } catch (err) {
-    console.warn("⚠️ Startup:", err.message);
-  }
+  console.log("🚀 Backend iniciando...");
+
+  await ensureUsersTable();
+  await ensureAdmin();
+
   console.log(`🚀 HeyDoctor backend corriendo en puerto: ${PORT}`);
 });
 
+export default app;
