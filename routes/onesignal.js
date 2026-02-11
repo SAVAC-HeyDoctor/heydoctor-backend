@@ -7,14 +7,27 @@ const router = express.Router();
 const appId = process.env.ONESIGNAL_APP_ID;
 const restKey = process.env.ONESIGNAL_REST_API_KEY;
 
-const config = OneSignal.createConfiguration({
-  userAuthKey: "",
-  restApiKey: restKey,
-});
+// ❗ Validación segura para evitar errores en Railway
+let client = null;
 
-const client = new OneSignal.DefaultApi(config);
+if (!appId || !restKey) {
+  console.warn("⚠️ OneSignal no configurado correctamente. Notificaciones deshabilitadas.");
+} else {
+  const config = OneSignal.createConfiguration({
+    userAuthKey: "",
+    restApiKey: restKey,
+  });
 
+  client = new OneSignal.DefaultApi(config);
+}
+
+// Función segura (no rompe el servidor si OneSignal no está configurado)
 async function sendNotification({ title, message, url }) {
+  if (!client) {
+    console.warn("⚠️ Notificación no enviada: OneSignal no está configurado.");
+    return { ok: false, warn: true };
+  }
+
   try {
     const notification = new OneSignal.Notification();
     notification.app_id = appId;
@@ -26,6 +39,7 @@ async function sendNotification({ title, message, url }) {
 
     const result = await client.createNotification(notification);
     console.log("🔔 Notificación enviada:", result.id);
+
     return { ok: true };
   } catch (err) {
     console.error("❌ Error enviando notificación:", err);
@@ -33,7 +47,7 @@ async function sendNotification({ title, message, url }) {
   }
 }
 
-// Envío custom: { title, message } o { title, message, url }
+// --- Rutas ---
 router.post("/send", async (req, res) => {
   const { title, message, url } = req.body;
 
@@ -41,57 +55,52 @@ router.post("/send", async (req, res) => {
     return res.status(400).json({ error: "title y message son requeridos" });
   }
 
-  await sendNotification({
+  const result = await sendNotification({
     title,
     message,
     url: url || "https://heydoctor.health",
   });
 
-  res.json({ ok: true });
+  res.json(result);
 });
 
 router.post("/verified", async (req, res) => {
   const { tipo, pais, title, message } = req.body;
 
-  if (title && message) {
-    await sendNotification({
-      title,
-      message,
-      url: "https://heydoctor.health",
-    });
-  } else {
-    await sendNotification({
-      title: "Documento HeyDoctor verificado",
-      message: `Un ${tipo || "documento"} fue verificado desde ${pais || "—"}. Estado: válido ✓`,
-      url: "https://heydoctor.health/dashboard/auditoria",
-    });
-  }
+  const payload = title && message
+    ? { title, message, url: "https://heydoctor.health" }
+    : {
+        title: "Documento HeyDoctor verificado",
+        message: `Un ${tipo || "documento"} fue verificado desde ${pais || "—"}. Estado: válido ✓`,
+        url: "https://heydoctor.health/dashboard/auditoria",
+      };
 
-  res.json({ ok: true });
+  const result = await sendNotification(payload);
+  res.json(result);
 });
 
 router.post("/interconsulta", async (req, res) => {
   const { paciente } = req.body;
 
-  await sendNotification({
+  const result = await sendNotification({
     title: "Nueva interconsulta registrada",
     message: `Se generó una interconsulta para ${paciente}.`,
     url: "https://heydoctor.health/dashboard/interconsultas",
   });
 
-  res.json({ ok: true });
+  res.json(result);
 });
 
 router.post("/receta", async (req, res) => {
   const { paciente } = req.body;
 
-  await sendNotification({
+  const result = await sendNotification({
     title: "Receta digital emitida",
     message: `Una nueva receta para ${paciente} está disponible.`,
     url: "https://heydoctor.health/dashboard/documentos",
   });
 
-  res.json({ ok: true });
+  res.json(result);
 });
 
 export default router;
