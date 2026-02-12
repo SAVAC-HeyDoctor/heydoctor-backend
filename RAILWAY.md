@@ -30,7 +30,9 @@ Railway usará por defecto `node server.js` (Procfile / package.json). No hace f
 
 ### 4. PostgreSQL en Railway
 
-Si usas el plugin PostgreSQL de Railway, añade la variable por referencia: Variables → Add reference → servicio PostgreSQL → `DATABASE_URL`.
+Si usas el plugin PostgreSQL de Railway, añade la variable por referencia: **Variables** → **Add variable** → **Add reference** → elige el servicio **PostgreSQL** → selecciona **`DATABASE_URL`** (o `DATABASE_PRIVATE_URL`).
+
+**Si ves "Invalid URL" en los logs:** `DATABASE_URL` no está definida o está vacía. Asegúrate de que el servicio backend tenga la variable vinculada al PostgreSQL de Railway.
 
 ### 5. Después del deploy
 
