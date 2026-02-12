@@ -177,22 +177,25 @@ if (process.env.NODE_ENV === "production") {
 // =========================
 // INICIAR SERVIDOR
 // =========================
-const server = app.listen(PORT, "0.0.0.0", async () => {
-  console.log("🚀 Backend iniciando...");
-
-  try {
-    await ensureUsersTable();
-    await ensureAdmin();
-  } catch (err) {
-    console.error("⚠️ Error en startup:", err.message);
-  }
-
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 HeyDoctor backend corriendo en puerto: ${PORT}`);
+  
+  // Inicializar DB en background (no bloquea el servidor)
+  (async () => {
+    try {
+      console.log("🚀 Backend iniciando...");
+      await ensureUsersTable();
+      await ensureAdmin();
+    } catch (err) {
+      console.error("⚠️ Error en startup:", err.message);
+    }
+  })();
 });
 
 // Manejar errores del servidor
 server.on("error", (err) => {
   console.error("❌ Error del servidor:", err);
+  process.exit(1);
 });
 
 export default app;
