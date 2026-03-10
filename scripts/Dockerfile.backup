@@ -1,0 +1,18 @@
+FROM alpine:3.19
+
+RUN apk add --no-cache \
+    postgresql16-client \
+    aws-cli \
+    bash \
+    coreutils \
+    tzdata
+
+ENV TZ=America/Santiago
+
+COPY backup-postgres.sh /scripts/backup-postgres.sh
+COPY restore-postgres.sh /scripts/restore-postgres.sh
+RUN chmod +x /scripts/*.sh
+
+COPY cron/backup-cron /etc/crontabs/root
+
+CMD ["crond", "-f", "-l", "2"]

@@ -1,0 +1,2 @@
+# HeyDoctor PostgreSQL backup — daily at 3:00 AM (Chile time)
+0 3 * * * /scripts/backup-postgres.sh >> /var/log/backup.log 2>&1

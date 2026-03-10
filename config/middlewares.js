@@ -1,6 +1,7 @@
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "https://heydoctor.health,https://www.heydoctor.health").split(",").map(s => s.trim());
 
 module.exports = [
+  "global::sentry",
   "strapi::errors",
   {
     name: "strapi::security",

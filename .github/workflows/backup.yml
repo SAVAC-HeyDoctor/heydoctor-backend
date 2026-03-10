@@ -1,0 +1,41 @@
+name: PostgreSQL Daily Backup
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 3 AM Chile (UTC-3)
+  workflow_dispatch: # Manual trigger
+
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  BACKUP_BUCKET: ${{ secrets.BACKUP_BUCKET }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+  AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
+  BACKUP_RETENTION_DAYS: "30"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install AWS CLI
+        run: |
+          pip install awscli
+
+      - name: Run backup
+        run: |
+          chmod +x scripts/backup-postgres.sh
+          bash scripts/backup-postgres.sh
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "::error::Database backup failed!"

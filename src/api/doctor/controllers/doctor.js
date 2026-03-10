@@ -1,9 +1,21 @@
-'use strict';
+"use strict";
 
-/**
- * doctor controller
- */
+const { createCoreController } = require("@strapi/strapi").factories;
+const cache = require("../../../../config/functions/redis-cache");
 
-const { createCoreController } = require('@strapi/strapi').factories;
+module.exports = createCoreController("api::doctor.doctor", ({ strapi }) => ({
+  async find(ctx) {
+    const cacheKey = `doctors:list:${JSON.stringify(ctx.query || {})}`;
 
-module.exports = createCoreController('api::doctor.doctor');
+    const data = await cache.getOrSet(
+      cacheKey,
+      async () => {
+        const { data, meta } = await super.find(ctx);
+        return { data, meta };
+      },
+      300
+    );
+
+    return data;
+  },
+}));

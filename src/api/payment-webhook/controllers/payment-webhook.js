@@ -88,6 +88,8 @@ module.exports = createCoreController(
         return entry;
       } catch (error) {
         strapi.log.error("payment-webhook create error:", error);
+        const { captureException } = require("../../../../config/functions/sentry");
+        captureException(error, { tags: { layer: "payment-webhook" } });
         return ctx.internalServerError("Error processing payment webhook");
       }
     },
