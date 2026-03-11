@@ -3,11 +3,37 @@
 const { initialize } = require("../config/functions/websockets");
 const { initSentry } = require("../config/functions/sentry");
 
+async function ensureDoctorApplicationPublicPermission(strapi) {
+  try {
+    const [publicRole] = await strapi.entityService.findMany(
+      "plugin::users-permissions.role",
+      { filters: { type: "public" } }
+    );
+    if (!publicRole) return;
+    const role = await strapi.entityService.findOne(
+      "plugin::users-permissions.role",
+      publicRole.id,
+      { populate: ["permissions"] }
+    );
+    const action = "api::doctor-application.doctor-application.create";
+    const hasPermission = role.permissions?.some((p) => p.action === action);
+    if (hasPermission) return;
+    await strapi.entityService.create(
+      "plugin::users-permissions.permission",
+      { data: { action, role: role.id } }
+    );
+    strapi.log.info("doctor-application: permiso create asignado a Public");
+  } catch (err) {
+    strapi.log.warn("doctor-application: no se pudo asignar permiso Public", err.message);
+  }
+}
+
 module.exports = {
   register(/*{ strapi }*/) {},
 
   async bootstrap({ strapi }) {
     initSentry(strapi);
     await initialize(strapi);
+    await ensureDoctorApplicationPublicPermission(strapi);
   },
 };

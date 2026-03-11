@@ -2,6 +2,7 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "https://heydoctor.health,h
 
 module.exports = [
   "global::sentry",
+  "global::rate-limit",
   "strapi::errors",
   {
     name: "strapi::security",

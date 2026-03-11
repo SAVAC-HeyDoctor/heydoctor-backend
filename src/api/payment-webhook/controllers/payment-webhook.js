@@ -5,6 +5,26 @@ const axios = require("axios");
 
 const TRANSACTION_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
+const PAYKU_WEBHOOK_IPS = (process.env.PAYKU_WEBHOOK_IPS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function getClientIp(ctx) {
+  return (
+    ctx.request.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    ctx.request.headers["x-real-ip"] ||
+    ctx.request.ip ||
+    ""
+  );
+}
+
+function verifyWebhookOrigin(ctx) {
+  if (PAYKU_WEBHOOK_IPS.length === 0) return true;
+  const ip = getClientIp(ctx);
+  return PAYKU_WEBHOOK_IPS.includes(ip);
+}
+
 function getPaykuClient() {
   const baseURL = process.env.PAYKU_URL;
   const token = process.env.PAYKU_TKPUB;
@@ -46,6 +66,13 @@ module.exports = createCoreController(
   "api::payment-webhook.payment-webhook",
   ({ strapi }) => ({
     async create(ctx) {
+      if (!verifyWebhookOrigin(ctx)) {
+        strapi.log.warn("payment-webhook: request from non-whitelisted IP", {
+          ip: getClientIp(ctx),
+        });
+        return ctx.forbidden("Webhook origin not allowed");
+      }
+
       const body = ctx.request.body;
 
       if (!body?.data?.transaction_id) {
