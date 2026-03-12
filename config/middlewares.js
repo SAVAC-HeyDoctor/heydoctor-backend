@@ -10,26 +10,10 @@ module.exports = [
       contentSecurityPolicy: {
         useDefaults: true,
         directives: {
-          "connect-src": ["'self'", "https://heydoctor.health", "https://api.heydoctor.health"],
-          "img-src": [
-            "'self'",
-            "data:",
-            "blob:",
-            "market-assets.strapi.io",
-            "res.cloudinary.com",
-          ],
-          "media-src": [
-            "'self'",
-            "data:",
-            "blob:",
-            "market-assets.strapi.io",
-            "res.cloudinary.com",
-          ],
+          "connect-src": ["'self'", "https:"],
+          "img-src": ["'self'", "data:", "blob:", "https:"],
+          "media-src": ["'self'", "data:", "blob:", "https:"],
           upgradeInsecureRequests: null,
-          "frame-src": [
-            "'self'",
-            "sandbox.embed.apollographql.com",
-          ],
         },
       },
     },
