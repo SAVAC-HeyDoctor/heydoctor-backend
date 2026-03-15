@@ -123,6 +123,11 @@ module.exports = {
       else hits = await searchDiagnosticsSQL(strapi, q, clinicId);
     }
 
+    let aiSuggestions = null;
+    if (q && type === "diagnostic") {
+      aiSuggestions = await search.aiMedicalSearch(q);
+    }
+
     eventBus.emit("search_performed", {
       clinicId,
       userId: user?.id,
@@ -132,6 +137,8 @@ module.exports = {
       source,
     });
 
-    return { data: hits, meta: { source } };
+    const meta = { source };
+    if (aiSuggestions && aiSuggestions.length > 0) meta.ai_suggestions = aiSuggestions;
+    return { data: hits, meta };
   },
 };

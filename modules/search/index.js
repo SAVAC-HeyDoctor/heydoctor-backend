@@ -89,6 +89,19 @@ async function search(indexName, q, filters = {}) {
   }
 }
 
+/**
+ * Búsqueda médica con AI - sugiere diagnósticos relacionados.
+ * Fallback: null si AI no está disponible.
+ */
+async function aiMedicalSearch(query) {
+  try {
+    const ai = require("../ai");
+    return ai.isEnabled() ? await ai.aiMedicalSearch(query) : null;
+  } catch {
+    return null;
+  }
+}
+
 module.exports = {
   isEnabled,
   getClient,
@@ -98,4 +111,5 @@ module.exports = {
   updateDocument,
   deleteDocument,
   search,
+  aiMedicalSearch,
 };

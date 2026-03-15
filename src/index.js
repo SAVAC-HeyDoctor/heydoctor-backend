@@ -14,6 +14,8 @@ const { initReadReplica } = require("../modules/database");
 const { setupIndexes } = require("../modules/search/setup");
 const { registerAnalyticsListeners } = require("../modules/analytics/analytics.events");
 const { ensureTable: ensureAnalyticsTable } = require("../modules/analytics/clickhouse");
+const { enqueueAiInsights } = require("../modules/jobs/queues");
+const ai = require("../modules/ai");
 
 async function ensureDoctorApplicationPublicPermission(strapi) {
   try {
@@ -86,5 +88,9 @@ module.exports = {
     await setupIndexes(strapi);
     registerAnalyticsListeners(strapi);
     await ensureAnalyticsTable();
+    if (ai.isEnabled() && process.env.REDIS_URL) {
+      const q = require("../modules/jobs/queues").getAiInsightsQueue();
+      await q.add("generate", { days: 7 }, { repeat: { pattern: "0 9 * * 1" } }).catch(() => {});
+    }
   },
 };

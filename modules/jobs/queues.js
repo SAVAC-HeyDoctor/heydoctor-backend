@@ -8,6 +8,8 @@ const QUEUE_NAMES = {
   IMAGE: "medical-image",
   WEBHOOK: "payment-webhook",
   ANALYTICS: "analytics-worker",
+  AI_SUMMARY: "ai-consultation-summary",
+  AI_INSIGHTS: "ai-weekly-insights",
 };
 
 function getPdfQueue() {
@@ -55,6 +57,24 @@ async function enqueueAnalytics(data) {
   return q.add("track", data);
 }
 
+function getAiSummaryQueue() {
+  return jobs.createQueue(QUEUE_NAMES.AI_SUMMARY);
+}
+
+function getAiInsightsQueue() {
+  return jobs.createQueue(QUEUE_NAMES.AI_INSIGHTS);
+}
+
+async function enqueueAiSummary(data) {
+  const q = getAiSummaryQueue();
+  return q.add("generate", data);
+}
+
+async function enqueueAiInsights(data) {
+  const q = getAiInsightsQueue();
+  return q.add("generate", data);
+}
+
 module.exports = {
   QUEUE_NAMES,
   getPdfQueue,
@@ -62,9 +82,13 @@ module.exports = {
   getImageQueue,
   getWebhookQueue,
   getAnalyticsQueue,
+  getAiSummaryQueue,
+  getAiInsightsQueue,
   enqueuePdf,
   enqueueEmail,
   enqueueImageProcessing,
   enqueueWebhook,
   enqueueAnalytics,
+  enqueueAiSummary,
+  enqueueAiInsights,
 };

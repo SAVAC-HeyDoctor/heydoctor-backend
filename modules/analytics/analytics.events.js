@@ -32,6 +32,14 @@ function registerAnalyticsListeners(strapi) {
 
   eventBus.on("consultation_ended", (payload) => {
     analytics.trackConsultation("consultation_ended", toEventPayload(payload));
+    const ai = require("../ai");
+    if (ai.isEnabled()) {
+      const { enqueueAiSummary } = require("../jobs/queues");
+      enqueueAiSummary({
+        appointmentId: payload.appointmentId ?? payload.consultationId,
+        clinicId: payload.clinicId,
+      });
+    }
   });
 
   eventBus.on("appointment_created", (payload) => {
