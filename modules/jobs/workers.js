@@ -1,7 +1,7 @@
 "use strict";
 
 const jobs = require("./index");
-const { getPdfQueue, getEmailQueue, getImageQueue, getWebhookQueue } = require("./queues");
+const { getPdfQueue, getEmailQueue, getImageQueue, getWebhookQueue, enqueueCopilotAnalysis } = require("./queues");
 const { insertEvent } = require("../analytics/clickhouse");
 
 async function processPdf(job) {
@@ -66,6 +66,48 @@ async function processAiInsights(job) {
   return result;
 }
 
+async function processCopilotScheduler(job) {
+  if (!jobs.isEnabled() || !global.strapi) return { skipped: true };
+  const copilot = require("../ai/copilot");
+  if (!copilot.isEnabled()) return { skipped: true, reason: "AI not configured" };
+  const appointments = await global.strapi.entityService.findMany("api::appointment.appointment", {
+    filters: { status: "in_progress" },
+    fields: ["id"],
+  });
+  for (const apt of appointments || []) {
+    await enqueueCopilotAnalysis({ consultationId: apt.id, appointmentId: apt.id }).catch(() => {});
+  }
+  return { processed: (appointments || []).length };
+}
+
+async function processCopilotAnalysis(job) {
+  const copilot = require("../ai/copilot");
+  const cache = require("../ai/copilot/cache");
+  if (!copilot.isEnabled()) return { skipped: true, reason: "AI not configured" };
+  const { consultationId, appointmentId } = job.data;
+  const aptId = appointmentId ?? consultationId;
+  if (!aptId || !global.strapi) return { skipped: true };
+  let messages = [];
+  let clinicalNotes = null;
+  let patientHistory = null;
+  try {
+    const apt = await global.strapi.entityService.findOne("api::appointment.appointment", aptId, {
+      populate: ["messages", "clinical_record", { patient: { populate: ["clinical_record"] } }],
+    });
+    messages = apt?.messages ?? [];
+    if (apt?.clinical_record) {
+      clinicalNotes = await global.strapi.entityService.findOne("api::clinical-record.clinical-record", apt.clinical_record.id ?? apt.clinical_record);
+    }
+    const patient = apt?.patient;
+    if (patient?.clinical_record) {
+      patientHistory = await global.strapi.entityService.findOne("api::clinical-record.clinical-record", patient.clinical_record.id ?? patient.clinical_record);
+    }
+  } catch (_) {}
+  const suggestions = await copilot.generateSuggestions({ messages, clinicalNotes, patientHistory });
+  if (suggestions) await cache.setSuggestions(aptId, suggestions);
+  return { ok: !!suggestions, consultationId: aptId };
+}
+
 function startWorkers(strapi) {
   if (!jobs.isEnabled()) {
     strapi?.log?.info("Jobs: Redis not configured, workers disabled");
@@ -78,7 +120,11 @@ function startWorkers(strapi) {
   jobs.createWorker("analytics-worker", processAnalytics);
   jobs.createWorker("ai-consultation-summary", processAiSummary);
   jobs.createWorker("ai-weekly-insights", processAiInsights);
-  strapi?.log?.info("Jobs: workers started (pdf, email, image, webhook, analytics, ai-summary, ai-insights)");
+  jobs.createWorker("ai-copilot", async (job) => {
+    if (job.name === "scheduler") return processCopilotScheduler(job);
+    return processCopilotAnalysis(job);
+  });
+  strapi?.log?.info("Jobs: workers started (pdf, email, image, webhook, analytics, ai-summary, ai-insights, ai-copilot)");
 }
 
-module.exports = { startWorkers, processPdf, processEmail, processImage, processWebhook, processAnalytics, processAiSummary, processAiInsights };
+module.exports = { startWorkers, processPdf, processEmail, processImage, processWebhook, processAnalytics, processAiSummary, processAiInsights, processCopilotAnalysis, processCopilotScheduler };

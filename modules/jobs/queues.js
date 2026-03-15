@@ -10,6 +10,7 @@ const QUEUE_NAMES = {
   ANALYTICS: "analytics-worker",
   AI_SUMMARY: "ai-consultation-summary",
   AI_INSIGHTS: "ai-weekly-insights",
+  AI_COPILOT: "ai-copilot",
 };
 
 function getPdfQueue() {
@@ -75,6 +76,20 @@ async function enqueueAiInsights(data) {
   return q.add("generate", data);
 }
 
+function getAiCopilotQueue() {
+  return jobs.createQueue(QUEUE_NAMES.AI_COPILOT);
+}
+
+async function enqueueCopilotAnalysis(data) {
+  const q = getAiCopilotQueue();
+  return q.add("analyze", data);
+}
+
+async function startCopilotScheduler() {
+  const q = getAiCopilotQueue();
+  await q.add("scheduler", {}, { repeat: { every: 30000, key: "copilot-scheduler" } }).catch(() => {});
+}
+
 module.exports = {
   QUEUE_NAMES,
   getPdfQueue,
@@ -91,4 +106,7 @@ module.exports = {
   enqueueAnalytics,
   enqueueAiSummary,
   enqueueAiInsights,
+  getAiCopilotQueue,
+  enqueueCopilotAnalysis,
+  startCopilotScheduler,
 };

@@ -14,8 +14,9 @@ const { initReadReplica } = require("../modules/database");
 const { setupIndexes } = require("../modules/search/setup");
 const { registerAnalyticsListeners } = require("../modules/analytics/analytics.events");
 const { ensureTable: ensureAnalyticsTable } = require("../modules/analytics/clickhouse");
-const { enqueueAiInsights } = require("../modules/jobs/queues");
+const { enqueueAiInsights, startCopilotScheduler } = require("../modules/jobs/queues");
 const ai = require("../modules/ai");
+const { registerCopilotListeners } = require("../modules/ai/copilot/copilot.events");
 
 async function ensureDoctorApplicationPublicPermission(strapi) {
   try {
@@ -67,6 +68,31 @@ async function ensureSearchPermission(strapi) {
   }
 }
 
+async function ensureCopilotPermission(strapi) {
+  try {
+    const [authRole] = await strapi.entityService.findMany(
+      "plugin::users-permissions.role",
+      { filters: { type: "authenticated" } }
+    );
+    if (!authRole) return;
+    const role = await strapi.entityService.findOne(
+      "plugin::users-permissions.role",
+      authRole.id,
+      { populate: ["permissions"] }
+    );
+    const action = "api::copilot.copilot.suggestions";
+    const hasPermission = role.permissions?.some((p) => p.action === action);
+    if (hasPermission) return;
+    await strapi.entityService.create(
+      "plugin::users-permissions.permission",
+      { data: { action, role: role.id } }
+    );
+    strapi.log.info("copilot: permiso suggestions asignado a Authenticated");
+  } catch (err) {
+    strapi.log.warn("copilot: no se pudo asignar permiso", err.message);
+  }
+}
+
 module.exports = {
   register(/*{ strapi }*/) {},
 
@@ -88,9 +114,12 @@ module.exports = {
     await setupIndexes(strapi);
     registerAnalyticsListeners(strapi);
     await ensureAnalyticsTable();
+    registerCopilotListeners(strapi);
+    await ensureCopilotPermission(strapi);
     if (ai.isEnabled() && process.env.REDIS_URL) {
       const q = require("../modules/jobs/queues").getAiInsightsQueue();
       await q.add("generate", { days: 7 }, { repeat: { pattern: "0 9 * * 1" } }).catch(() => {});
+      await startCopilotScheduler();
     }
   },
 };
