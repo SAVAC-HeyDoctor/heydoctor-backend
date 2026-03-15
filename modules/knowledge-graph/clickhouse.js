@@ -123,6 +123,24 @@ async function aggregateByTarget(sourceNodes, relationshipType, clinicId = null,
   }
 }
 
+async function getTotalWeight(sourceNodes, relationshipType, clinicId = null) {
+  const c = analytics.getClient();
+  if (!c || !sourceNodes?.length) return 0;
+
+  const escaped = sourceNodes.map((n) => `'${String(n).replace(/'/g, "''")}'`).join(",");
+  const clinicFilter = clinicId != null ? `AND clinic_id = ${Number(clinicId)}` : "";
+  const q = `SELECT sum(weight) as total FROM ${TABLE_NAME}
+    WHERE source_node IN (${escaped}) AND relationship_type = '${String(relationshipType).replace(/'/g, "''")}' ${clinicFilter}`;
+
+  try {
+    const result = await c.query({ query: q, format: "JSONEachRow" });
+    const rows = await result.json();
+    return Number(rows?.[0]?.total ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
 module.exports = {
   TABLE_NAME,
   ensureTable,
@@ -130,4 +148,5 @@ module.exports = {
   clearEdges,
   queryEdges,
   aggregateByTarget,
+  getTotalWeight,
 };

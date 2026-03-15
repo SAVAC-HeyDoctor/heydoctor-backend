@@ -12,6 +12,7 @@ const QUEUE_NAMES = {
   AI_INSIGHTS: "ai-weekly-insights",
   AI_COPILOT: "ai-copilot",
   KNOWLEDGE_GRAPH: "knowledge-graph-build",
+  AI_MODEL_REFRESH: "ai-model-refresh",
 };
 
 function getPdfQueue() {
@@ -100,6 +101,15 @@ async function enqueueKnowledgeGraphBuild(data = {}) {
   return q.add("build", data);
 }
 
+function getAiModelRefreshQueue() {
+  return jobs.createQueue(QUEUE_NAMES.AI_MODEL_REFRESH);
+}
+
+async function enqueueAiModelRefresh(data = {}) {
+  const q = getAiModelRefreshQueue();
+  return q.add("refresh", data);
+}
+
 module.exports = {
   QUEUE_NAMES,
   getPdfQueue,
@@ -121,4 +131,6 @@ module.exports = {
   startCopilotScheduler,
   getKnowledgeGraphQueue,
   enqueueKnowledgeGraphBuild,
+  getAiModelRefreshQueue,
+  enqueueAiModelRefresh,
 };

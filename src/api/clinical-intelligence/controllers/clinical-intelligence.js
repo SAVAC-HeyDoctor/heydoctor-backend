@@ -2,6 +2,7 @@
 
 const clinicalIntelligence = require("../../../../modules/clinical-intelligence");
 const knowledgeGraph = require("../../../../modules/knowledge-graph");
+const medicalAiEngine = require("../../../../modules/medical-ai-engine");
 
 module.exports = {
   async suggest(ctx) {
@@ -27,6 +28,10 @@ module.exports = {
 
     if (knowledgeGraph.isEnabled()) {
       result = await knowledgeGraph.enrichClinicalSuggestions(symptoms, clinicId, result);
+    }
+    if (medicalAiEngine.isEnabled()) {
+      const symptomsArr = typeof symptoms === "string" ? symptoms.split(/[\s,;]+/).filter(Boolean) : [symptoms];
+      result = await medicalAiEngine.enrichSuggestions(symptomsArr.length ? symptomsArr : [symptoms], clinicId, result);
     }
 
     return ctx.send(result);

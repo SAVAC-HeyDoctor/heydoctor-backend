@@ -2,6 +2,7 @@
 
 const cache = require("../../../../modules/ai/copilot/cache");
 const copilot = require("../../../../modules/ai/copilot");
+const medicalAiEngine = require("../../../../modules/medical-ai-engine");
 const { ensureClinicAccess } = require("../../../../utils/tenant-scope");
 const { enqueueCopilotAnalysis } = require("../../../../modules/jobs/queues");
 
@@ -35,6 +36,18 @@ module.exports = {
       return ctx.send({
         data: null,
         meta: { ai_enabled: true, status: "processing", message: "Análisis en curso, intente de nuevo en unos segundos" },
+      });
+    }
+
+    if (medicalAiEngine.isEnabled() && suggestions.symptoms_detected?.length > 0) {
+      const clinicId = apt.clinic?.id ?? apt.clinic;
+      const base = {
+        suggested_diagnoses: (suggestions.possible_diagnoses ?? []).map((d) => ({ code: String(d), description: String(d) })),
+        suggested_treatments: [],
+      };
+      suggestions = await medicalAiEngine.enrichSuggestions(suggestions.symptoms_detected, clinicId, {
+        ...suggestions,
+        ...base,
       });
     }
 
