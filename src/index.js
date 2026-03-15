@@ -68,6 +68,31 @@ async function ensureSearchPermission(strapi) {
   }
 }
 
+async function ensureClinicalIntelligencePermission(strapi) {
+  try {
+    const [authRole] = await strapi.entityService.findMany(
+      "plugin::users-permissions.role",
+      { filters: { type: "authenticated" } }
+    );
+    if (!authRole) return;
+    const role = await strapi.entityService.findOne(
+      "plugin::users-permissions.role",
+      authRole.id,
+      { populate: ["permissions"] }
+    );
+    const action = "api::clinical-intelligence.clinical-intelligence.suggest";
+    const hasPermission = role.permissions?.some((p) => p.action === action);
+    if (hasPermission) return;
+    await strapi.entityService.create(
+      "plugin::users-permissions.permission",
+      { data: { action, role: role.id } }
+    );
+    strapi.log.info("clinical-intelligence: permiso suggest asignado a Authenticated");
+  } catch (err) {
+    strapi.log.warn("clinical-intelligence: no se pudo asignar permiso", err.message);
+  }
+}
+
 async function ensureCopilotPermission(strapi) {
   try {
     const [authRole] = await strapi.entityService.findMany(
@@ -116,6 +141,7 @@ module.exports = {
     await ensureAnalyticsTable();
     registerCopilotListeners(strapi);
     await ensureCopilotPermission(strapi);
+    await ensureClinicalIntelligencePermission(strapi);
     if (ai.isEnabled() && process.env.REDIS_URL) {
       const q = require("../modules/jobs/queues").getAiInsightsQueue();
       await q.add("generate", { days: 7 }, { repeat: { pattern: "0 9 * * 1" } }).catch(() => {});
