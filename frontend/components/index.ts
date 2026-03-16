@@ -18,3 +18,6 @@ export { PatientReminders } from './PatientReminders';
 export { TemplateSelector } from './TemplateSelector';
 export { DoctorAnalyticsPanel } from './DoctorAnalyticsPanel';
 export { ClinicalAppsPanel } from './ClinicalAppsPanel';
+export { LabOrdersPanel } from './LabOrdersPanel';
+export { PrescriptionPanel } from './PrescriptionPanel';
+export { ClinicalInsightsPanel } from './ClinicalInsightsPanel';

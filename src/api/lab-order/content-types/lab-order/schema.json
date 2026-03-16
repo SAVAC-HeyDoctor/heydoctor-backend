@@ -1,0 +1,50 @@
+{
+  "kind": "collectionType",
+  "collectionName": "lab_orders",
+  "info": {
+    "singularName": "lab-order",
+    "pluralName": "lab-orders",
+    "displayName": "Lab Order",
+    "description": "Órdenes de laboratorio - Clinical App"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "patient": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::patient.patient",
+      "required": true
+    },
+    "doctor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::doctor.doctor",
+      "required": true
+    },
+    "diagnosis_code": {
+      "type": "string"
+    },
+    "lab_tests": {
+      "type": "json",
+      "default": []
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "ordered", "in_progress", "completed", "cancelled"],
+      "default": "pending"
+    },
+    "clinic": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::clinic.clinic"
+    },
+    "appointment": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::appointment.appointment"
+    }
+  }
+}

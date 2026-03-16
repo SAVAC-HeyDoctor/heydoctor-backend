@@ -23,7 +23,17 @@ const iconMap: Record<string, string> = {
   image: '🖼️',
   pill: '💊',
   heart: '❤️',
+  chart: '📊',
   app: '📱',
+};
+
+const displayNames: Record<string, string> = {
+  'lab-orders': 'Lab Orders',
+  'prescriptions': 'Prescriptions',
+  'clinical-insights': 'AI Clinical Insights',
+  radiology: 'Radiology',
+  pharmacy: 'Pharmacy',
+  'remote-monitoring': 'Remote Monitoring',
 };
 
 export function ClinicalAppsPanel({
@@ -73,12 +83,7 @@ export function ClinicalAppsPanel({
             <span className="text-lg">{iconMap[app.icon ?? 'app'] ?? '📱'}</span>
             <div className="min-w-0 flex-1">
               <p className="font-medium text-sm text-gray-800 truncate">
-                {app.name === 'lab-orders' && 'Lab Orders'}
-                {app.name === 'radiology' && 'Radiology'}
-                {app.name === 'pharmacy' && 'Pharmacy'}
-                {app.name === 'remote-monitoring' && 'Remote Monitoring'}
-                {!['lab-orders', 'radiology', 'pharmacy', 'remote-monitoring'].includes(app.name) &&
-                  app.name}
+                {displayNames[app.name] ?? app.name}
               </p>
               <p className="text-xs text-gray-500 line-clamp-2">{app.description}</p>
             </div>

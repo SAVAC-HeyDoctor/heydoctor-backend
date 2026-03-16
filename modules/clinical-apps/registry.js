@@ -50,11 +50,29 @@ function getAppsForClinic(clinic, allApps = listClinicalApps()) {
 // Registrar apps por defecto
 registerClinicalApp({
   name: "lab-orders",
-  description: "Laboratory test ordering",
-  routes: [{ path: "/lab-orders", method: "GET" }, { path: "/lab-orders/:id", method: "GET" }],
+  description: "Order laboratory tests",
+  routes: [{ path: "/lab-orders", method: "POST" }, { path: "/lab-orders/patient/:id", method: "GET" }],
   permissions: ["fhir.patient.read", "fhir.observation.read"],
   icon: "flask",
-  category: "lab",
+  category: "diagnostics",
+});
+
+registerClinicalApp({
+  name: "prescriptions",
+  description: "Create and manage prescriptions",
+  routes: [{ path: "/prescriptions", method: "POST" }, { path: "/prescriptions/patient/:id", method: "GET" }],
+  permissions: ["fhir.patient.read", "fhir.medicationrequest.read"],
+  icon: "pill",
+  category: "pharmacy",
+});
+
+registerClinicalApp({
+  name: "clinical-insights",
+  description: "AI clinical insights for the patient",
+  routes: [{ path: "/clinical-insights/patient/:id", method: "GET" }],
+  permissions: ["fhir.patient.read", "fhir.observation.read"],
+  icon: "chart",
+  category: "insights",
 });
 
 registerClinicalApp({

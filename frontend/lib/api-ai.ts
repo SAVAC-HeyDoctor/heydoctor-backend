@@ -104,6 +104,93 @@ export async function generateClinicalNote(params: {
   return res.json();
 }
 
+/** Lab Orders: crear orden, listar por paciente, sugerir exámenes */
+export async function createLabOrder(data: {
+  patient: number;
+  doctor?: number;
+  diagnosis_code?: string;
+  lab_tests: string[];
+  status?: string;
+  appointment?: number;
+}) {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/lab-orders`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify({ data }),
+  });
+  if (!res.ok) throw new Error('Failed to create lab order');
+  return res.json();
+}
+
+export async function fetchLabOrdersByPatient(patientId: number | string) {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/lab-orders/patient/${patientId}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch lab orders');
+  return res.json();
+}
+
+export async function suggestLabTests(diagnosis?: string) {
+  const base = getApiBase();
+  const q = diagnosis ? `?diagnosis=${encodeURIComponent(diagnosis)}` : '';
+  const res = await fetch(`${base}/api/lab-orders/suggest-tests${q}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to suggest lab tests');
+  return res.json();
+}
+
+/** Prescriptions: crear receta, listar por paciente, sugerir medicamentos */
+export async function createPrescription(data: {
+  patient: number;
+  doctor?: number;
+  medications: Array<{ name: string } | string>;
+  dosage?: string;
+  instructions?: string;
+  appointment?: number;
+}) {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/prescriptions`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify({ data }),
+  });
+  if (!res.ok) throw new Error('Failed to create prescription');
+  return res.json();
+}
+
+export async function fetchPrescriptionsByPatient(patientId: number | string) {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/prescriptions/patient/${patientId}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch prescriptions');
+  return res.json();
+}
+
+export async function suggestMedications(diagnosis?: string) {
+  const base = getApiBase();
+  const q = diagnosis ? `?diagnosis=${encodeURIComponent(diagnosis)}` : '';
+  const res = await fetch(`${base}/api/prescriptions/suggest-medications${q}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to suggest medications');
+  return res.json();
+}
+
+/** Clinical Insights: insights clínicos del paciente */
+export async function fetchClinicalInsights(patientId: number | string, symptoms?: string[]) {
+  const base = getApiBase();
+  const q = symptoms?.length ? `?symptoms=${symptoms.map(encodeURIComponent).join(',')}` : '';
+  const res = await fetch(`${base}/api/clinical-insight/patient/${patientId}${q}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch clinical insights');
+  return res.json();
+}
+
 /** Clinical Apps: lista de apps disponibles para la clínica */
 export async function fetchClinicalApps(clinicId?: number | null) {
   const base = getApiBase();

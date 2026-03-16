@@ -2,9 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { fetchClinicalSuggestions, fetchPredictiveRisk } from '../lib/api-ai';
+import { ClinicalInsightsPanel } from './ClinicalInsightsPanel';
 import { PredictiveInsightsPanel } from './PredictiveInsightsPanel';
 
 interface PatientInsightsPanelProps {
+  /** ID del paciente (para Clinical Insights) */
+  patientId?: number | string | null;
   /** Síntomas o motivo de consulta del paciente (desde admission_reason, etc.) */
   symptoms: string[];
   clinicId?: number | null;
@@ -17,6 +20,7 @@ interface PatientInsightsPanelProps {
  * Datos de: GET /api/clinical-intelligence/suggest
  */
 export function PatientInsightsPanel({
+  patientId,
   symptoms,
   clinicId,
   className = '',
@@ -46,7 +50,9 @@ export function PatientInsightsPanel({
       .finally(() => setLoading(false));
   }, [symptomText, clinicId]);
 
-  if (!symptomText.trim()) return null;
+  if (!symptomText.trim() && !patientId) return null;
+
+  const symptomArrForInsights = symptomText ? symptomText.split(/\s+/).filter(Boolean) : [];
 
   return (
     <aside className={`w-72 flex-shrink-0 space-y-4 ${className}`}>
@@ -58,6 +64,9 @@ export function PatientInsightsPanel({
         </div>
       ) : (
         <>
+          {patientId && (
+            <ClinicalInsightsPanel patientId={patientId} symptoms={symptomArrForInsights} />
+          )}
           {ciData && (
             <div className="rounded-lg border border-gray-200 p-3">
               <h4 className="font-medium text-gray-700 mb-2 text-sm">Clinical Intelligence</h4>

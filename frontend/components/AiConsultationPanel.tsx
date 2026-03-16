@@ -5,12 +5,17 @@ import { fetchCopilotSuggestions, evaluateCdss, fetchPredictiveRisk } from '../l
 import { CopilotPanel } from './CopilotPanel';
 import { ClinicalAlertsPanel } from './ClinicalAlertsPanel';
 import { ClinicalAppsPanel } from './ClinicalAppsPanel';
+import { ClinicalInsightsPanel } from './ClinicalInsightsPanel';
+import { LabOrdersPanel } from './LabOrdersPanel';
+import { PrescriptionPanel } from './PrescriptionPanel';
 import { PredictiveInsightsPanel } from './PredictiveInsightsPanel';
 
 interface AiConsultationPanelProps {
   consultationId: number | string;
+  patientId?: number | string | null;
   symptoms?: string[];
   clinicId?: number | null;
+  diagnosisCode?: string;
   /** Intervalo de polling en ms (default: 30000) */
   pollInterval?: number;
   className?: string;
@@ -27,6 +32,8 @@ export function AiConsultationPanel({
   clinicId,
   pollInterval = 30000,
   showClinicalApps = true,
+  patientId,
+  diagnosisCode,
   className = '',
 }: AiConsultationPanelProps) {
   const [copilotData, setCopilotData] = useState<any>(null);
@@ -102,6 +109,21 @@ export function AiConsultationPanel({
         preventive_actions={predictiveData?.preventive_actions}
         isLoading={loading.predictive}
       />
+      {patientId && (
+        <>
+          <ClinicalInsightsPanel patientId={patientId} symptoms={symptoms} />
+          <LabOrdersPanel
+            patientId={patientId}
+            consultationId={consultationId}
+            diagnosisCode={diagnosisCode}
+          />
+          <PrescriptionPanel
+            patientId={patientId}
+            consultationId={consultationId}
+            diagnosisCode={diagnosisCode}
+          />
+        </>
+      )}
       {showClinicalApps && <ClinicalAppsPanel clinicId={clinicId} />}
     </aside>
   );
