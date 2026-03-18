@@ -53,12 +53,11 @@ npm run start:prod
 
 ## Railway
 
-1. Conectar el repo a Railway
-2. Añadir servicio PostgreSQL (Railway lo inyecta vía `DATABASE_URL` o variables)
-3. Configurar variables: `JWT_SECRET`, `OPENAI_API_KEY`
-4. Deploy automático con Dockerfile o Nixpacks
-
-Railway detecta `Dockerfile` o `nixpacks.toml` para el build.
+1. Conectar el repo `heydoctor-backend` a Railway
+2. **Root Directory**: En Settings → Build, configurar `nest-backend` como root
+3. Añadir PostgreSQL (Railway inyecta `DATABASE_URL`)
+4. Variables: `JWT_SECRET`, `OPENAI_API_KEY`
+5. Deploy automático con Dockerfile
 
 ## Endpoints soportados
 
