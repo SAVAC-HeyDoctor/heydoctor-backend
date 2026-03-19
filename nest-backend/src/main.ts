@@ -1,4 +1,6 @@
 import 'dotenv/config';
+console.log('🔥 CORRECT MAIN EXECUTED');
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
