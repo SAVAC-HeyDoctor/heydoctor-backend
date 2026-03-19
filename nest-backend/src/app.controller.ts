@@ -9,6 +9,13 @@ export class AppController {
   }
 
   @Public()
+  @Get('ping')
+  ping() {
+    console.log('PING OK');
+    return 'ok';
+  }
+
+  @Public()
   @Get()
   getRoot() {
     return { status: 'ok', message: 'HeyDoctor NestJS API' };
