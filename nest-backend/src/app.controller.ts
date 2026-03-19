@@ -1,10 +1,9 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { Public } from './modules/auth/decorators/public.decorator';
-import { AuthService } from './modules/auth/auth.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly authService: AuthService) {
+  constructor() {
     console.log('AppController loaded');
   }
 
@@ -34,15 +33,5 @@ export class AppController {
       auth: 'POST /api/auth/login',
       health: 'GET /api/health',
     };
-  }
-
-  @Public()
-  @Post('auth/login')
-  async login(@Body() body: { email?: string; password?: string }) {
-    console.log('LOGIN HIT');
-    return this.authService.login(
-      body.email || '',
-      body.password || '',
-    );
   }
 }
