@@ -4,6 +4,7 @@ import { ConfigModule } from './config/config.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { typeOrmConfig } from './config/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
+import { AuthController } from './modules/auth/auth.controller';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { ClinicResolverInterceptor } from './common/interceptors/clinic-resolver.interceptor';
 import { AppController } from './app.controller';
@@ -44,7 +45,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     PatientRemindersModule,
     AnalyticsModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, AuthController],
   providers: [
     {
       provide: APP_GUARD,
