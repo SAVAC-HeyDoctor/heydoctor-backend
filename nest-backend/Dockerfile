@@ -1,6 +1,9 @@
 # Build stage - TypeScript compiled INSIDE container
 FROM node:20-alpine AS builder
 
+ARG CACHE_BUST=1
+RUN echo "Cache bust: $CACHE_BUST"
+
 WORKDIR /app
 
 ENV npm_config_legacy_peer_deps=true
