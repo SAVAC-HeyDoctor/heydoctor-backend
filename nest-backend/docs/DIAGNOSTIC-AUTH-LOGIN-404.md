@@ -21,8 +21,7 @@
 - `dist/main.js` usa `AppModule` ✓
 
 ### 5. Railway
-- **railway.json**: `startCommand: "node dist/main.js"` ✓
-- **Dockerfile**: `CMD ["node", "dist/main.js"]` ✓
+- **package.json start**: `node dist/main.js` ✓
 - **Root directory**: `/nest-backend` (debe coincidir con la carpeta del repo)
 
 ---

@@ -27,9 +27,7 @@
 | nest-cli.json sourceRoot | `src` |
 | tsconfig.json outDir | `./dist` |
 | tsconfig.json rootDir | (implicit: project root) |
-| package.json start:prod | `node dist/main.js` |
-| railway.json startCommand | `node dist/main.js` |
-| Dockerfile CMD | `node dist/main.js` |
+| package.json start | `node dist/main.js` |
 
 ## 4. File Executed in Production
 
@@ -49,13 +47,13 @@ If Root Directory is wrong (empty or repo root):
 
 | If Root = | Builder | Start | Result |
 |-----------|---------|-------|--------|
-| `nest-backend` | DOCKERFILE | node dist/main.js | Nest (correct) |
-| `` (empty) | NIXPACKS | npm run start = strapi start | Strapi (wrong) |
+| `nest-backend` | Railpack | node dist/main.js | Nest (correct) |
+| `` (empty) | Railpack | npm run start = strapi start | Strapi (wrong) |
 
 **Evidence:** If you see Nest controllers (patient-reminders, analytics) but NOT AuthController, you are running Nest. So Root Directory is likely correct. The issue may be:
 
 - **AuthModule init failure:** TypeORM/JWT/Passport fails silently during AuthModule load
-- **Build cache:** Railway using cached Docker layer with old dist
+- **Build cache:** Railway using cached build with old dist
 - **Branch mismatch:** Deploying from branch that doesn't have latest AuthModule
 
 ## 6. Fix Required

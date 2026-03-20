@@ -57,7 +57,7 @@ npm run start:prod
 2. **Root Directory**: En Settings → Build, configurar `nest-backend` como root
 3. Añadir PostgreSQL (Railway inyecta `DATABASE_URL`)
 4. Variables: `JWT_SECRET`, `OPENAI_API_KEY`
-5. Deploy automático con Dockerfile
+5. Deploy automático con Railpack
 
 ## Endpoints soportados
 

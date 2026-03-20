@@ -1,5 +1,5 @@
 import 'dotenv/config';
-console.log('🔥 REAL ENTRYPOINT EXECUTED');
+console.log('🔥 CLEAN RAILPACK START');
 
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
