@@ -2,7 +2,8 @@ export type AuditResourceType =
   | 'patient'
   | 'diagnosis'
   | 'prescription'
-  | 'lab_order';
+  | 'lab_order'
+  | 'ai_insight';
 
 /**
  * Metadatos para el interceptor: de dónde sacar IDs (params, body o respuesta).
@@ -20,4 +21,10 @@ export interface AuditLogOptions {
   resourceIdParam?: string;
   /** Tras éxito, usar `response.data.id` (entidad creada/actualizada) */
   resourceIdFromResponse?: boolean;
+  /** Consulta vinculada (params) */
+  consultationIdParam?: string;
+  /** Clave body para consultationId */
+  consultationIdBodyKey?: string;
+  /** Tras éxito, `response.data.consultationId` */
+  consultationIdFromResponse?: boolean;
 }

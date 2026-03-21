@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   AiInsight,
-  Patient,
   Consultation,
   ClinicalRecord,
   LabOrder,
@@ -16,7 +15,6 @@ import { AiInsightsService } from './ai-insights.service';
   imports: [
     TypeOrmModule.forFeature([
       AiInsight,
-      Patient,
       Consultation,
       ClinicalRecord,
       LabOrder,

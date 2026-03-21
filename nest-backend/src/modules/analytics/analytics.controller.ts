@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('analytics')
 export class AnalyticsController {
@@ -9,17 +10,13 @@ export class AnalyticsController {
   @Get('doctor-adoption')
   async getDoctorAdoption(
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
     @Query('days') days: string,
   ) {
-    if (!clinicId) {
-      return {
-        data: {
-          period: { days: 30, from: new Date().toISOString() },
-          adoption: [],
-        },
-      };
-    }
     const daysNum = days ? parseInt(days, 10) : 30;
-    return this.service.getDoctorAdoption(clinicId, isNaN(daysNum) ? 30 : daysNum);
+    return this.service.getDoctorAdoption(
+      { userId, clinicId },
+      isNaN(daysNum) ? 30 : daysNum,
+    );
   }
 }

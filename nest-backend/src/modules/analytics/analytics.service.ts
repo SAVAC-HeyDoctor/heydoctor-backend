@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Doctor, ClinicUser } from '../../entities';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Injectable()
 export class AnalyticsService {
@@ -10,14 +13,18 @@ export class AnalyticsService {
     private readonly doctorRepo: Repository<Doctor>,
     @InjectRepository(ClinicUser)
     private readonly clinicUserRepo: Repository<ClinicUser>,
+    private readonly authz: AuthorizationService,
   ) {}
 
-  async getDoctorAdoption(clinicId: string, days: number = 30) {
+  async getDoctorAdoption(actor: AuthActor, days: number = 30) {
+    const cid = requireClinicId(actor.clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+
     const fromDate = new Date();
     fromDate.setDate(fromDate.getDate() - days);
 
     const clinicUsers = await this.clinicUserRepo.find({
-      where: { clinicId },
+      where: { clinicId: cid },
       relations: ['user'],
     });
 
@@ -25,12 +32,11 @@ export class AnalyticsService {
     const doctors =
       userIds.length > 0
         ? await this.doctorRepo.find({
-            where: { clinicId, userId: In(userIds) },
+            where: { clinicId: cid, userId: In(userIds) },
             relations: ['user'],
           })
         : [];
 
-    // Mock adoption metrics - in production would aggregate from usage logs
     const adoption = doctors.map((d) => ({
       doctorId: d.id,
       doctorName: d.user

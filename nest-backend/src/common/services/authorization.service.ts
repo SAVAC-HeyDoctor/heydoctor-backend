@@ -129,6 +129,40 @@ export class AuthorizationService {
   }
 
   /**
+   * WebRTC ICE: solo el médico asignado o el paciente con cuenta vinculada (userId).
+   */
+  async assertConsultationParticipantForWebRtc(
+    consultationId: string,
+    userId: string,
+    clinicId: string | undefined | null,
+  ): Promise<Consultation> {
+    const cid = requireClinicId(clinicId);
+    const consultation = await this.consultationRepo.findOne({
+      where: { id: consultationId },
+      relations: ['doctor', 'patient'],
+    });
+    if (!consultation) {
+      throw new NotFoundException('Consultation not found');
+    }
+    assertClinicMatch(consultation.clinicId, cid);
+
+    const isDoctor =
+      consultation.doctor != null && consultation.doctor.userId === userId;
+    const isPatient =
+      consultation.patient != null &&
+      consultation.patient.userId != null &&
+      consultation.patient.userId === userId;
+
+    if (!isDoctor && !isPatient) {
+      throw new ForbiddenException(
+        'Not authorized to access WebRTC for this consultation',
+      );
+    }
+
+    return consultation;
+  }
+
+  /**
    * Punto único reutilizable: valida tenant + propiedad médico cuando aplica.
    */
   async assertOwnership(

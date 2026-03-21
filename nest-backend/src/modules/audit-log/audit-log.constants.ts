@@ -7,6 +7,7 @@ export const AuditActions = {
   LAB_ORDER_CREATE: 'lab_order.create',
   LAB_ORDER_UPDATE: 'lab_order.update',
   LAB_ORDER_DELETE: 'lab_order.delete',
+  AI_INSIGHT_GENERATE: 'ai_insight.generate',
 } as const;
 
 export type AuditAction = (typeof AuditActions)[keyof typeof AuditActions];

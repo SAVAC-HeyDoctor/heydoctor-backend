@@ -30,11 +30,23 @@ export class AuditLog {
   @Column({ type: 'uuid', nullable: true })
   patientId: string | null;
 
-  @Column({ type: 'uuid' })
-  userId: string;
+  @Column({ type: 'uuid', nullable: true })
+  userId: string | null;
 
   @Column({ type: 'uuid', nullable: true })
   clinicId: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  consultationId: string | null;
+
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  status: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  httpStatus: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  errorMessage: string | null;
 
   @Column({ type: 'varchar', length: 16, nullable: true })
   httpMethod: string | null;

@@ -1,5 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Consultation } from '../../entities';
 import { OpenAIService } from '../../common/services/openai.service';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 export interface CopilotSuggestionsResponse {
   symptoms_detected: string[];
@@ -27,9 +33,20 @@ export interface ClinicalNoteResponse {
 
 @Injectable()
 export class CopilotService {
-  constructor(private readonly openai: OpenAIService) {}
+  constructor(
+    private readonly openai: OpenAIService,
+    private readonly authz: AuthorizationService,
+    @InjectRepository(Consultation)
+    private readonly consultationRepo: Repository<Consultation>,
+  ) {}
 
-  async getSuggestions(consultationId: string): Promise<{ data: CopilotSuggestionsResponse }> {
+  async getSuggestions(
+    consultationId: string,
+    actor: AuthActor,
+  ): Promise<{ data: CopilotSuggestionsResponse }> {
+    const cid = requireClinicId(actor.clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+
     const emptyData: CopilotSuggestionsResponse = {
       symptoms_detected: [],
       possible_diagnoses: [],
@@ -43,6 +60,26 @@ export class CopilotService {
       return { data: emptyData };
     }
 
+    let anonymizedContext = '';
+    if (consultationId?.trim()) {
+      const consultation = await this.consultationRepo.findOne({
+        where: { id: consultationId.trim() },
+      });
+      if (!consultation) {
+        throw new NotFoundException('Consultation not found');
+      }
+      await this.authz.assertOwnership(
+        { type: 'consultation', entity: consultation },
+        actor,
+      );
+      anonymizedContext = [
+        consultation.appointment_reason,
+        consultation.notes,
+      ]
+        .filter(Boolean)
+        .join('\n');
+    }
+
     try {
       const systemPrompt = `Eres un asistente clínico. Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown.
 El JSON debe tener exactamente estas claves:
@@ -51,10 +88,13 @@ El JSON debe tener exactamente estas claves:
 - suggested_diagnoses: array de objetos { code, description }
 - suggested_questions: array de strings (preguntas sugeridas para la anamnesis)
 - suggested_tests: array de strings (estudios o exámenes sugeridos)
-- suggested_treatments: array de strings (tratamientos sugeridos)`;
+- suggested_treatments: array de strings (tratamientos sugeridos)
+No incluyas nombres de pacientes, fechas de nacimiento ni identificadores.`;
 
-      const userPrompt = `Para la consulta ID: ${consultationId || 'sin ID'}, genera sugerencias clínicas completas.
-Devuelve el JSON con las 6 claves solicitadas. Si no hay información suficiente, genera sugerencias genéricas basadas en buenas prácticas.`;
+      const userPrompt = `Contexto clínico libre de texto (sin identificadores):
+${anonymizedContext || 'No hay contexto adicional; usa buenas prácticas generales.'}
+
+Genera sugerencias clínicas completas. Devuelve el JSON con las 6 claves solicitadas.`;
 
       const response = await this.openai.complete(userPrompt, systemPrompt);
       const parsed = this.openai.parseJsonResponse<CopilotSuggestionsResponse>(response);
@@ -91,7 +131,11 @@ Devuelve el JSON con las 6 claves solicitadas. Si no hay información suficiente
 
   async generateClinicalNote(
     consultationData: GenerateNoteInput,
+    actor: AuthActor,
   ): Promise<{ data: ClinicalNoteResponse }> {
+    const cid = requireClinicId(actor.clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+
     const emptyData: ClinicalNoteResponse = {
       chief_complaint: '',
       history_of_present_illness: '',
@@ -99,12 +143,26 @@ Devuelve el JSON con las 6 claves solicitadas. Si no hay información suficiente
       plan: '',
     };
 
+    if (consultationData.consultationId?.trim()) {
+      const consultation = await this.consultationRepo.findOne({
+        where: { id: consultationData.consultationId.trim() },
+      });
+      if (!consultation) {
+        throw new NotFoundException('Consultation not found');
+      }
+      await this.authz.assertOwnership(
+        { type: 'consultation', entity: consultation },
+        actor,
+      );
+    }
+
     if (!this.openai.isAvailable) {
       return { data: emptyData };
     }
 
     try {
-      const symptomsStr = (consultationData.symptoms || []).join(', ') || 'No especificados';
+      const symptomsStr =
+        (consultationData.symptoms || []).join(', ') || 'No especificados';
       const clinicalNotes = consultationData.clinical_notes || '';
       const patientHistory = consultationData.patient_history || '';
       const messagesStr = (consultationData.messages || [])
@@ -117,13 +175,13 @@ Responde ÚNICAMENTE con un objeto JSON válido con estas claves:
 - history_of_present_illness: string (historia de la enfermedad actual)
 - assessment: string (evaluación/diagnóstico)
 - plan: string (plan de tratamiento)
-Genera en español, de forma concisa y profesional.`;
+Genera en español, de forma concisa y profesional. No incluyas nombres propios ni identificadores en la salida.`;
 
       const userPrompt = `Genera la nota clínica con:
 
 Síntomas: ${symptomsStr}
 Notas clínicas: ${clinicalNotes}
-Historia del paciente: ${patientHistory}
+Historia clínica resumida (sin identificadores): ${patientHistory}
 Mensajes de la consulta:
 ${messagesStr || 'N/A'}
 

@@ -7,10 +7,6 @@ export class AppointmentFiltersDto {
   patientId?: string;
 
   @IsOptional()
-  @IsUUID()
-  doctorId?: string;
-
-  @IsOptional()
   @IsDateString()
   from?: string;
 

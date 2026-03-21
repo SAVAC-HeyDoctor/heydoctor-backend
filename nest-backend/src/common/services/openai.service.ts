@@ -44,6 +44,25 @@ export class OpenAIService {
   }
 
   /**
+   * Igual que complete pero devuelve modelo y temperatura usados (telemetría / auditoría).
+   */
+  async completeWithTelemetry(
+    prompt: string,
+    systemPrompt?: string,
+    options?: { model?: string; temperature?: number },
+  ): Promise<{ text: string; model: string; temperature: number }> {
+    const model = options?.model || 'gpt-4o-mini';
+    const temperature = options?.temperature ?? 0.7;
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+    messages.push({ role: 'user', content: prompt });
+    const text = await this.chatCompletion(messages, { model, temperature });
+    return { text, model, temperature };
+  }
+
+  /**
    * Parses JSON from OpenAI response, handling markdown code blocks.
    */
   parseJsonResponse<T>(response: string): T | null {

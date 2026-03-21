@@ -31,7 +31,15 @@ export class UpdateConsultationDto {
 
   @IsOptional()
   @IsString()
-  status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
+  status?:
+    | 'draft'
+    | 'scheduled'
+    | 'in_progress'
+    | 'completed'
+    | 'cancelled'
+    | 'no_show'
+    | 'signed'
+    | 'locked';
 
   @IsOptional()
   @IsBoolean()

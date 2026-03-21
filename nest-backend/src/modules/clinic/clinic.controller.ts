@@ -50,11 +50,12 @@ export class AppointmentsController {
   @Get()
   async getAppointments(
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
     @Query() filters: AppointmentFiltersDto,
   ) {
-    if (!clinicId) {
-      return { data: [], total: 0 };
-    }
-    return this.clinicService.getAppointments(clinicId, filters);
+    return this.clinicService.getAppointments(clinicId, filters, {
+      userId,
+      clinicId,
+    });
   }
 }

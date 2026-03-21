@@ -68,6 +68,21 @@ export class AiInsight {
   @Column({ name: 'recommended_actions', type: 'jsonb', nullable: true })
   recommended_actions: RecommendedAction[] | null;
 
+  /** Modelo LLM usado (sin contenido del prompt). */
+  @Column({ name: 'ai_model', type: 'varchar', length: 64, nullable: true })
+  ai_model: string | null;
+
+  @Column({
+    name: 'ai_temperature',
+    type: 'double precision',
+    nullable: true,
+  })
+  ai_temperature: number | null;
+
+  /** SHA-256 del prompt (sistema + usuario) para trazabilidad sin almacenar texto. */
+  @Column({ name: 'prompt_hash', type: 'varchar', length: 64, nullable: true })
+  prompt_hash: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

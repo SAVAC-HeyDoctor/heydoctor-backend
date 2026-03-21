@@ -4,6 +4,8 @@ import { GenerateInsightsDto } from './dto/generate-insights.dto';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
+import { Audit } from '../audit-log/decorators/audit.decorator';
+import { AuditActions } from '../audit-log/audit-log.constants';
 
 @Controller('ai-insights')
 export class AiInsightsController {
@@ -29,6 +31,13 @@ export class AiInsightsController {
     );
   }
 
+  @Audit({
+    action: AuditActions.AI_INSIGHT_GENERATE,
+    resourceType: 'ai_insight',
+    patientIdBodyKey: 'patientId',
+    consultationIdBodyKey: 'consultationId',
+    resourceIdFromResponse: true,
+  })
   @Post('generate')
   async generate(
     @ClinicId() clinicId: string,

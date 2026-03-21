@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -28,6 +30,7 @@ export class ClinicService {
     private readonly consultationRepo: Repository<Consultation>,
     @InjectRepository(ClinicalRecord)
     private readonly clinicalRecordRepo: Repository<ClinicalRecord>,
+    private readonly authz: AuthorizationService,
   ) {}
 
   async getClinicForUser(userId: string) {
@@ -72,19 +75,25 @@ export class ClinicService {
     return { data: items, total };
   }
 
-  async getAppointments(clinicId: string, filters: AppointmentFiltersDto) {
+  async getAppointments(
+    clinicId: string | undefined | null,
+    filters: AppointmentFiltersDto,
+    actor: AuthActor,
+  ) {
+    const cid = requireClinicId(clinicId);
+    const doctor = await this.authz.resolveDoctorForUser(actor.userId, cid);
+
     const qb = this.consultationRepo
       .createQueryBuilder('a')
       .leftJoinAndSelect('a.patient', 'patient')
       .leftJoinAndSelect('a.doctor', 'doctor')
       .leftJoinAndSelect('doctor.user', 'user')
-      .where('a.clinicId = :clinicId', { clinicId });
+      .where('a.clinicId = :clinicId', { clinicId: cid })
+      .andWhere('a.doctorId = :doctorId', { doctorId: doctor.id });
 
     if (filters.patientId) {
+      await this.authz.assertPatientInClinic(filters.patientId, cid);
       qb.andWhere('a.patientId = :patientId', { patientId: filters.patientId });
-    }
-    if (filters.doctorId) {
-      qb.andWhere('a.doctorId = :doctorId', { doctorId: filters.doctorId });
     }
     if (filters.status) {
       qb.andWhere('a.status = :status', { status: filters.status });

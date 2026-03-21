@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Consultation, Patient } from '../../entities';
@@ -33,8 +37,6 @@ export class ConsultationsService {
       .leftJoinAndSelect('c.clinic', 'clinic')
       .leftJoinAndSelect('c.clinical_record', 'clinical_record')
       .leftJoinAndSelect('c.diagnostic', 'diagnostic')
-      .leftJoinAndSelect('c.lab_orders', 'lab_orders')
-      .leftJoinAndSelect('c.prescriptions', 'prescriptions')
       .where('c.clinicId = :clinicId', { clinicId: cid })
       .andWhere('c.doctorId = :doctorId', { doctorId: doctor.id });
 
@@ -161,6 +163,11 @@ export class ConsultationsService {
       { type: 'consultation', entity: consultation },
       actor,
     );
+    if (consultation.status === 'locked') {
+      throw new ForbiddenException(
+        'Consultation is locked and cannot be deleted',
+      );
+    }
     await this.consultationRepo.remove(consultation);
     return { data: consultation };
   }

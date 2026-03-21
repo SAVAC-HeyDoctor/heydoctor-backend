@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Patient, Doctor, Cie10Code } from '../../entities';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Injectable()
 export class SearchService {
@@ -12,13 +15,17 @@ export class SearchService {
     private readonly doctorRepo: Repository<Doctor>,
     @InjectRepository(Cie10Code)
     private readonly cie10Repo: Repository<Cie10Code>,
+    private readonly authz: AuthorizationService,
   ) {}
 
   async search(
     q: string,
     type: 'patient' | 'doctor' | 'diagnostic' | undefined,
-    clinicId?: string,
+    actor: AuthActor,
   ) {
+    const cid = requireClinicId(actor.clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+
     const term = (q || '').trim();
     if (!term) {
       return { data: { patients: [], doctors: [], diagnostics: [] } };
@@ -43,9 +50,7 @@ export class SearchService {
           '(p.firstname ILIKE :term OR p.lastname ILIKE :term OR p.identification ILIKE :term)',
           { term: searchPattern },
         );
-      if (clinicId) {
-        qb.andWhere('p.clinicId = :clinicId', { clinicId });
-      }
+      qb.andWhere('p.clinicId = :clinicId', { clinicId: cid });
       results.patients = await qb.take(20).getMany();
     }
 
@@ -57,9 +62,7 @@ export class SearchService {
           '(u.firstName ILIKE :term OR u.lastName ILIKE :term OR u.email ILIKE :term OR d.speciality ILIKE :term)',
           { term: searchPattern },
         );
-      if (clinicId) {
-        qb.andWhere('d.clinicId = :clinicId', { clinicId });
-      }
+      qb.andWhere('d.clinicId = :clinicId', { clinicId: cid });
       results.doctors = await qb.take(20).getMany();
     }
 

@@ -18,11 +18,14 @@ import { LabOrder } from './lab-order.entity';
 import { Prescription } from './prescription.entity';
 
 export type ConsultationStatus =
+  | 'draft'
   | 'scheduled'
   | 'in_progress'
   | 'completed'
   | 'cancelled'
-  | 'no_show';
+  | 'no_show'
+  | 'signed'
+  | 'locked';
 
 @Entity('appointments')
 export class Consultation {

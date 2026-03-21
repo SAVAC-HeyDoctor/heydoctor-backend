@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import {
   Injectable,
   NotFoundException,
@@ -6,7 +7,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   AiInsight,
-  Patient,
   Consultation,
   ClinicalRecord,
   LabOrder,
@@ -23,6 +23,7 @@ import { GenerateInsightsDto } from './dto/generate-insights.dto';
 import { requireClinicId } from '../../common/utils/clinic-scope.util';
 import { AuthorizationService } from '../../common/services/authorization.service';
 import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
+import { CLINICAL_AI_DISCLAIMER } from '../../common/constants/clinical-ai-disclaimer';
 
 interface AiInsightsResponse {
   predicted_conditions: PredictedCondition[];
@@ -36,8 +37,6 @@ export class AiInsightsService {
   constructor(
     @InjectRepository(AiInsight)
     private readonly aiInsightRepo: Repository<AiInsight>,
-    @InjectRepository(Patient)
-    private readonly patientRepo: Repository<Patient>,
     @InjectRepository(Consultation)
     private readonly consultationRepo: Repository<Consultation>,
     @InjectRepository(ClinicalRecord)
@@ -70,25 +69,17 @@ export class AiInsightsService {
       .take(limit);
 
     const items = await qb.getMany();
-    return { data: items };
+    return { data: items, disclaimer: CLINICAL_AI_DISCLAIMER };
   }
 
   async generate(
     dto: GenerateInsightsDto,
     clinicId: string | undefined | null,
     actor: AuthActor,
-  ): Promise<{ data: AiInsight }> {
+  ): Promise<{ data: AiInsight; disclaimer: string }> {
     const cid = requireClinicId(clinicId);
     await this.authz.resolveDoctorForUser(actor.userId, cid);
     await this.authz.assertPatientInClinic(dto.patientId, cid);
-
-    const patient = await this.patientRepo.findOne({
-      where: { id: dto.patientId, clinicId: cid },
-      relations: ['clinical_record'],
-    });
-    if (!patient) {
-      throw new NotFoundException('Patient not found');
-    }
 
     if (dto.consultationId) {
       const consultation = await this.consultationRepo.findOne({
@@ -132,6 +123,10 @@ export class AiInsightsService {
       recommended_actions: [],
     };
 
+    let aiModel: string | null = null;
+    let aiTemperature: number | null = null;
+    let promptHash: string | null = null;
+
     if (this.openai.isAvailable) {
       try {
         const systemPrompt = `You are a clinical intelligence assistant for doctors. Analyze the patient data and return ONLY a valid JSON object with these exact keys (no markdown, no extra text):
@@ -140,21 +135,26 @@ export class AiInsightsService {
 - clinical_patterns: array of { pattern: string, description?: string, relevance?: string, evidence?: string[] }
 - recommended_actions: array of { action: string, priority?: "low"|"medium"|"high"|"urgent", category?: string, rationale?: string }
 
+Do not include patient names, dates of birth, national IDs, emails, or phone numbers. Use only clinical descriptors and structured context.
+
 Be concise. Use ICD-10 codes when possible for conditions. Prioritize actionable insights.`;
 
-        const userPrompt = `Patient: ${patient.firstname} ${patient.lastname}, ${patient.birth_date ? `DOB: ${patient.birth_date}` : ''}
+        const userPrompt = `Symptoms/Chief complaint: ${symptomsInput}
 
-Symptoms/Chief complaint: ${symptomsInput}
-
-Clinical context:
+Structured clinical context (anonymized clinic-scoped summaries only):
 ${fullContext || 'No additional context.'}
 
 Return the JSON with clinical insights.`;
 
-        const response = await this.openai.complete(userPrompt, systemPrompt);
-        const parsed = this.openai.parseJsonResponse<AiInsightsResponse>(
-          response,
-        );
+        promptHash = createHash('sha256')
+          .update(`${systemPrompt}\n${userPrompt}`, 'utf8')
+          .digest('hex');
+
+        const { text, model, temperature } =
+          await this.openai.completeWithTelemetry(userPrompt, systemPrompt);
+        aiModel = model;
+        aiTemperature = temperature;
+        const parsed = this.openai.parseJsonResponse<AiInsightsResponse>(text);
         if (parsed) {
           result = {
             predicted_conditions: Array.isArray(parsed.predicted_conditions)
@@ -184,10 +184,13 @@ Return the JSON with clinical insights.`;
       risk_scores: result.risk_scores,
       clinical_patterns: result.clinical_patterns,
       recommended_actions: result.recommended_actions,
+      ai_model: aiModel,
+      ai_temperature: aiTemperature,
+      prompt_hash: promptHash,
     });
 
     const saved = await this.aiInsightRepo.save(insight);
-    return { data: saved };
+    return { data: saved, disclaimer: CLINICAL_AI_DISCLAIMER };
   }
 
   private async buildClinicalContext(

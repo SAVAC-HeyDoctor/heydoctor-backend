@@ -1,11 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { OpenAIService } from '../../common/services/openai.service';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Injectable()
 export class ClinicalIntelligenceService {
-  constructor(private readonly openai: OpenAIService) {}
+  constructor(
+    private readonly openai: OpenAIService,
+    private readonly authz: AuthorizationService,
+  ) {}
 
-  async suggest(symptoms: string) {
+  async suggest(symptoms: string, actor: AuthActor) {
+    const cid = requireClinicId(actor.clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+
     if (!this.openai.isAvailable) {
       return {
         data: {
@@ -17,11 +26,11 @@ export class ClinicalIntelligenceService {
     }
 
     try {
-      const prompt = `Given symptoms: "${symptoms}". Return JSON: { suggestions: [clinical action strings], possibleConditions: [{ code, name, likelihood }] }`;
+      const prompt = `Given de-identified symptom description only (no names or IDs): "${symptoms.slice(0, 4000)}". Return JSON: { suggestions: [clinical action strings], possibleConditions: [{ code, name, likelihood }] }`;
 
       const response = await this.openai.complete(
         prompt,
-        'You are a clinical intelligence assistant. Return only valid JSON.',
+        'You are a clinical intelligence assistant. Return only valid JSON. Never echo personal identifiers.',
       );
 
       let result = {

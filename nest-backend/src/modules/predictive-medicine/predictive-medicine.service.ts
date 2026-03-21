@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { OpenAIService } from '../../common/services/openai.service';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
+import { sanitizeContextJsonForAi } from '../../common/utils/sanitize-ai-context.util';
 
 export interface PredictiveRiskInput {
   symptoms?: string[];
@@ -22,9 +26,18 @@ export interface PredictiveRiskResponse {
 
 @Injectable()
 export class PredictiveMedicineService {
-  constructor(private readonly openai: OpenAIService) {}
+  constructor(
+    private readonly openai: OpenAIService,
+    private readonly authz: AuthorizationService,
+  ) {}
 
-  async assessRisk(data: PredictiveRiskInput): Promise<PredictiveRiskResponse> {
+  async assessRisk(
+    data: PredictiveRiskInput,
+    actor: AuthActor,
+  ): Promise<PredictiveRiskResponse> {
+    const cid = requireClinicId(actor.clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+
     const emptyResponse: PredictiveRiskResponse = {
       predicted_conditions: [],
       risk_scores: [],
@@ -37,18 +50,19 @@ export class PredictiveMedicineService {
 
     try {
       const symptomsStr = (data.symptoms || []).join(', ') || 'No especificados';
-      const contextStr = JSON.stringify(data.context || {});
+      const contextStr = sanitizeContextJsonForAi(data.context);
 
       const systemPrompt = `Eres un sistema de medicina predictiva. Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown.
 El JSON debe tener exactamente estas claves:
 - predicted_conditions: array de objetos { condition, probability (0-1), timeframe opcional }
 - risk_scores: array de objetos { condition, score (0-100), level: "low"|"medium"|"high" }
-- preventive_actions: array de strings (acciones preventivas recomendadas)`;
+- preventive_actions: array de strings (acciones preventivas recomendadas)
+No incluyas identificadores de personas en las respuestas.`;
 
       const userPrompt = `Evalúa el riesgo predictivo basado en:
 
 Síntomas: ${symptomsStr}
-Contexto: ${contextStr}
+Contexto (estructura sanitizada): ${contextStr}
 
 Devuelve el JSON solicitado.`;
 
