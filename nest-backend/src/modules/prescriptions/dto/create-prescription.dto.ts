@@ -25,6 +25,10 @@ export class MedicationItemDto {
 
   @IsOptional()
   @IsString()
+  route?: string;
+
+  @IsOptional()
+  @IsString()
   instructions?: string;
 }
 

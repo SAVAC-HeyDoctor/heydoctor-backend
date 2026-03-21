@@ -15,12 +15,14 @@ import { Diagnosis } from './diagnosis.entity';
 
 /**
  * Medication item within a prescription. Matches Strapi medications JSON structure.
+ * Real-world treatment: name, dosage, frequency, duration, route (oral, IV, etc), instructions.
  */
 export interface MedicationItem {
   name: string;
   dosage?: string;
   frequency?: string;
   duration?: string;
+  route?: string;
   instructions?: string;
 }
 
