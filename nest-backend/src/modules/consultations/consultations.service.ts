@@ -66,6 +66,7 @@ export class ConsultationsService {
         'clinic',
         'clinical_record',
         'diagnostic',
+        'diagnostic.cie10_code',
         'lab_orders',
         'prescriptions',
       ],

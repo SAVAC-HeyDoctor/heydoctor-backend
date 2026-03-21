@@ -23,6 +23,7 @@ import { FavoriteOrdersModule } from './modules/favorite-orders/favorite-orders.
 import { PatientRemindersModule } from './modules/patient-reminders/patient-reminders.module';
 import { PatientsModule } from './modules/patients/patients.module';
 import { ConsultationsModule } from './modules/consultations/consultations.module';
+import { DiagnosisModule } from './modules/diagnosis/diagnosis.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
@@ -34,6 +35,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     ClinicModule,
     PatientsModule,
     ConsultationsModule,
+    DiagnosisModule,
     CopilotModule,
     CdssModule,
     PredictiveMedicineModule,
