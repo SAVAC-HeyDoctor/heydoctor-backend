@@ -1,6 +1,17 @@
-import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+} from '@nestjs/common';
 import { LabOrdersService } from './lab-orders.service';
 import { CreateLabOrderDto } from './dto/create-lab-order.dto';
+import { UpdateLabOrderDto } from './dto/update-lab-order.dto';
+import { LabOrderFiltersDto } from './dto/lab-order-filters.dto';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,6 +25,32 @@ export class LabOrdersController {
     @InjectRepository(Doctor)
     private readonly doctorRepo: Repository<Doctor>,
   ) {}
+
+  @Get()
+  async findAll(@Query() filters: LabOrderFiltersDto) {
+    return this.labOrdersService.findAll(filters);
+  }
+
+  @Get('patient/:patientId')
+  async getByPatient(
+    @Param('patientId') patientId: string,
+    @ClinicId() clinicId: string,
+  ) {
+    if (!clinicId) {
+      return { data: [] };
+    }
+    return this.labOrdersService.getByPatient(patientId, clinicId);
+  }
+
+  @Get('suggest-tests')
+  async suggestTests(@Query('q') q: string) {
+    return this.labOrdersService.suggestTests(q || '');
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.labOrdersService.findOne(id);
+  }
 
   @Post()
   async create(
@@ -30,19 +67,16 @@ export class LabOrdersController {
     return this.labOrdersService.create(clinicId, doctor.id, dto);
   }
 
-  @Get('patient/:id')
-  async getByPatient(
-    @Param('id') patientId: string,
-    @ClinicId() clinicId: string,
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateLabOrderDto,
   ) {
-    if (!clinicId) {
-      return { data: [] };
-    }
-    return this.labOrdersService.getByPatient(patientId, clinicId);
+    return this.labOrdersService.update(id, dto);
   }
 
-  @Get('suggest-tests')
-  async suggestTests(@Query('q') q: string) {
-    return this.labOrdersService.suggestTests(q || '');
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    return this.labOrdersService.remove(id);
   }
 }

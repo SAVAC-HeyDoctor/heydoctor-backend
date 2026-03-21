@@ -11,6 +11,18 @@ import { Patient } from './patient.entity';
 import { Doctor } from './doctor.entity';
 import { Clinic } from './clinic.entity';
 import { Consultation } from './consultation.entity';
+import { Diagnosis } from './diagnosis.entity';
+
+/** Lab order status - Strapi enum + FHIR ServiceRequest alignment. */
+export type LabOrderStatus =
+  | 'pending'
+  | 'ordered'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
+
+/** Priority - FHIR RequestPriority: routine | urgent | asap | stat. */
+export type LabOrderPriority = 'routine' | 'urgent' | 'asap' | 'stat';
 
 @Entity('lab_orders')
 export class LabOrder {
@@ -29,14 +41,25 @@ export class LabOrder {
   @Column('uuid', { nullable: true })
   consultationId: string | null;
 
-  @Column({ type: 'jsonb' })
-  tests: string[];
+  @Column('uuid', { nullable: true })
+  diagnosisId: string | null;
+
+  /** Test names - Strapi lab_tests, FHIR ServiceRequest.code. */
+  @Column({ name: 'lab_tests', type: 'jsonb', default: [] })
+  lab_tests: string[];
 
   @Column({ default: 'pending' })
-  status: string;
+  status: LabOrderStatus;
+
+  @Column({ default: 'routine' })
+  priority: LabOrderPriority;
+
+  /** Strapi: diagnosis_code. ICD/reason code for the order. */
+  @Column({ name: 'diagnosis_code', nullable: true })
+  diagnosis_code: string | null;
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notes: string | null;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -62,4 +85,8 @@ export class LabOrder {
   })
   @JoinColumn({ name: 'consultationId' })
   consultation: Consultation | null;
+
+  @ManyToOne(() => Diagnosis, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'diagnosisId' })
+  diagnosis: Diagnosis | null;
 }

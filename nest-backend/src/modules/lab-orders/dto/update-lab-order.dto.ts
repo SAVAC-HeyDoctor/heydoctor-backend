@@ -6,9 +6,10 @@ import {
   IsIn,
 } from 'class-validator';
 
-export class CreateLabOrderDto {
+export class UpdateLabOrderDto {
+  @IsOptional()
   @IsUUID()
-  patientId: string;
+  patientId?: string;
 
   @IsOptional()
   @IsUUID()
@@ -26,10 +27,10 @@ export class CreateLabOrderDto {
   @IsUUID()
   diagnosisId?: string;
 
-  /** Test names - Strapi lab_tests. */
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  lab_tests: string[];
+  lab_tests?: string[];
 
   @IsOptional()
   @IsIn(['pending', 'ordered', 'in_progress', 'completed', 'cancelled'])
