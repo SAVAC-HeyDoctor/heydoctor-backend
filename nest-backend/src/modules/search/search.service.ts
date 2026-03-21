@@ -40,7 +40,7 @@ export class SearchService {
       const qb = this.patientRepo
         .createQueryBuilder('p')
         .where(
-          '(p.firstName ILIKE :term OR p.lastName ILIKE :term OR p.email ILIKE :term OR p.documentNumber ILIKE :term)',
+          '(p.firstname ILIKE :term OR p.lastname ILIKE :term OR p.identification ILIKE :term)',
           { term: searchPattern },
         );
       if (clinicId) {

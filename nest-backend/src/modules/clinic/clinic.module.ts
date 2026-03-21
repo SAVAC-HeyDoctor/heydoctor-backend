@@ -8,11 +8,7 @@ import {
   ClinicalRecord,
 } from '../../entities';
 import { ClinicService } from './clinic.service';
-import {
-  ClinicController,
-  PatientsController,
-  AppointmentsController,
-} from './clinic.controller';
+import { ClinicController, AppointmentsController } from './clinic.controller';
 
 @Module({
   imports: [
@@ -24,7 +20,7 @@ import {
       ClinicalRecord,
     ]),
   ],
-  controllers: [ClinicController, PatientsController, AppointmentsController],
+  controllers: [ClinicController, AppointmentsController],
   providers: [ClinicService],
   exports: [ClinicService],
 })

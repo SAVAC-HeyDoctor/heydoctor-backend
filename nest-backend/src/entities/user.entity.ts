@@ -5,9 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
 import { ClinicUser } from './clinic-user.entity';
 import { Doctor } from './doctor.entity';
+import { Patient } from './patient.entity';
 
 @Entity('users')
 export class User {
@@ -37,4 +39,7 @@ export class User {
 
   @OneToMany(() => Doctor, (d) => d.user)
   doctors: Doctor[];
+
+  @OneToOne(() => Patient, (p) => p.user)
+  patient: Patient;
 }

@@ -44,14 +44,14 @@ export class ClinicService {
 
     if (filters.search) {
       qb.andWhere(
-        '(p.firstName ILIKE :search OR p.lastName ILIKE :search OR p.email ILIKE :search OR p.documentNumber ILIKE :search)',
+        '(p.firstname ILIKE :search OR p.lastname ILIKE :search OR p.identification ILIKE :search)',
         { search: `%${filters.search}%` },
       );
     }
 
     const [items, total] = await qb
-      .orderBy('p.lastName', 'ASC')
-      .addOrderBy('p.firstName', 'ASC')
+      .orderBy('p.lastname', 'ASC')
+      .addOrderBy('p.firstname', 'ASC')
       .skip(filters.offset ?? 0)
       .take(filters.limit ?? 20)
       .getManyAndCount();
@@ -95,7 +95,7 @@ export class ClinicService {
   async getPatientMedicalRecord(patientId: string, clinicId: string) {
     const patient = await this.patientRepo.findOne({
       where: { id: patientId, clinicId },
-      relations: ['clinicalRecords', 'clinicalRecords.diagnostics', 'clinicalRecords.treatments', 'clinicalRecords.doctor', 'clinicalRecords.doctor.user'],
+      relations: ['clinical_record', 'clinical_record.diagnostics', 'clinical_record.treatments', 'clinical_record.doctor', 'clinical_record.doctor.user'],
     });
     if (!patient) {
       throw new NotFoundException('Patient not found');

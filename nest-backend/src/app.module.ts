@@ -21,6 +21,7 @@ import { ClinicalAppsModule } from './modules/clinical-apps/clinical-apps.module
 import { TemplatesModule } from './modules/templates/templates.module';
 import { FavoriteOrdersModule } from './modules/favorite-orders/favorite-orders.module';
 import { PatientRemindersModule } from './modules/patient-reminders/patient-reminders.module';
+import { PatientsModule } from './modules/patients/patients.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
@@ -30,6 +31,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     CommonModule,
     AuthModule,
     ClinicModule,
+    PatientsModule,
     CopilotModule,
     CdssModule,
     PredictiveMedicineModule,

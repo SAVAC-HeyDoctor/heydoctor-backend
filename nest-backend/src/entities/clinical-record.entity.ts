@@ -43,7 +43,7 @@ export class ClinicalRecord {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @ManyToOne(() => Patient, (p) => p.clinicalRecords, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Patient, (p) => p.clinical_record, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'patientId' })
   patient: Patient;
 

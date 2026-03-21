@@ -6,10 +6,12 @@ import {
   UpdateDateColumn,
   ManyToOne,
   OneToMany,
+  ManyToMany,
   JoinColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Clinic } from './clinic.entity';
+import { Patient } from './patient.entity';
 import { Appointment } from './appointment.entity';
 import { LabOrder } from './lab-order.entity';
 import { Prescription } from './prescription.entity';
@@ -57,4 +59,7 @@ export class Doctor {
 
   @OneToMany(() => ClinicalRecord, (c) => c.doctor)
   clinicalRecords: ClinicalRecord[];
+
+  @ManyToMany(() => Patient, (p) => p.favorite_doctors)
+  favoritePatients: Patient[];
 }
