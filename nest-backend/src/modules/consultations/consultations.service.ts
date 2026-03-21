@@ -1,18 +1,13 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Consultation, Patient, Doctor } from '../../entities';
+import { Consultation, Patient } from '../../entities';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
 import { ConsultationFiltersDto } from './dto/consultation-filters.dto';
-import {
-  assertClinicMatch,
-  requireClinicId,
-} from '../../common/utils/clinic-scope.util';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Injectable()
 export class ConsultationsService {
@@ -21,15 +16,16 @@ export class ConsultationsService {
     private readonly consultationRepo: Repository<Consultation>,
     @InjectRepository(Patient)
     private readonly patientRepo: Repository<Patient>,
-    @InjectRepository(Doctor)
-    private readonly doctorRepo: Repository<Doctor>,
+    private readonly authz: AuthorizationService,
   ) {}
 
   async findAll(
     clinicId: string | undefined | null,
-    filters?: ConsultationFiltersDto,
+    filters: ConsultationFiltersDto | undefined,
+    actor: AuthActor,
   ): Promise<{ data: Consultation[]; total: number }> {
     const cid = requireClinicId(clinicId);
+    const doctor = await this.authz.resolveDoctorForUser(actor.userId, cid);
     const qb = this.consultationRepo
       .createQueryBuilder('c')
       .leftJoinAndSelect('c.patient', 'patient')
@@ -39,13 +35,11 @@ export class ConsultationsService {
       .leftJoinAndSelect('c.diagnostic', 'diagnostic')
       .leftJoinAndSelect('c.lab_orders', 'lab_orders')
       .leftJoinAndSelect('c.prescriptions', 'prescriptions')
-      .where('c.clinicId = :clinicId', { clinicId: cid });
+      .where('c.clinicId = :clinicId', { clinicId: cid })
+      .andWhere('c.doctorId = :doctorId', { doctorId: doctor.id });
 
     if (filters?.patientId) {
       qb.andWhere('c.patientId = :patientId', { patientId: filters.patientId });
-    }
-    if (filters?.doctorId) {
-      qb.andWhere('c.doctorId = :doctorId', { doctorId: filters.doctorId });
     }
     if (filters?.status) {
       qb.andWhere('c.status = :status', { status: filters.status });
@@ -69,6 +63,7 @@ export class ConsultationsService {
   async findOne(
     id: string,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: Consultation }> {
     const cid = requireClinicId(clinicId);
     const consultation = await this.consultationRepo.findOne({
@@ -89,34 +84,25 @@ export class ConsultationsService {
     if (!consultation) {
       throw new NotFoundException(`Consultation with id ${id} not found`);
     }
-    assertClinicMatch(consultation.clinicId, cid);
+    await this.authz.assertOwnership(
+      { type: 'consultation', entity: consultation },
+      actor,
+    );
     return { data: consultation };
   }
 
   async create(
     dto: CreateConsultationDto,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: Consultation }> {
     const cid = requireClinicId(clinicId);
-    const patient = await this.patientRepo.findOne({
-      where: { id: dto.patientId },
-    });
-    if (!patient) {
-      throw new BadRequestException(`Patient ${dto.patientId} not found`);
-    }
-    assertClinicMatch(patient.clinicId, cid);
-
-    const doctor = await this.doctorRepo.findOne({
-      where: { id: dto.doctorId },
-    });
-    if (!doctor) {
-      throw new BadRequestException(`Doctor ${dto.doctorId} not found`);
-    }
-    assertClinicMatch(doctor.clinicId, cid);
+    const doctor = await this.authz.resolveDoctorForUser(actor.userId, cid);
+    await this.authz.assertPatientInClinic(dto.patientId, cid);
 
     const consultation = this.consultationRepo.create({
       patientId: dto.patientId,
-      doctorId: dto.doctorId,
+      doctorId: doctor.id,
       clinicId: cid,
       clinicalRecordId: dto.clinicalRecordId ?? null,
       date: new Date(dto.date),
@@ -136,31 +122,20 @@ export class ConsultationsService {
     id: string,
     dto: UpdateConsultationDto,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: Consultation }> {
     const cid = requireClinicId(clinicId);
     const consultation = await this.consultationRepo.findOne({ where: { id } });
     if (!consultation) {
       throw new NotFoundException(`Consultation with id ${id} not found`);
     }
-    assertClinicMatch(consultation.clinicId, cid);
+    await this.authz.assertOwnership(
+      { type: 'consultation', entity: consultation },
+      actor,
+    );
 
     if (dto.patientId) {
-      const patient = await this.patientRepo.findOne({
-        where: { id: dto.patientId },
-      });
-      if (!patient) {
-        throw new BadRequestException(`Patient ${dto.patientId} not found`);
-      }
-      assertClinicMatch(patient.clinicId, cid);
-    }
-    if (dto.doctorId) {
-      const doctor = await this.doctorRepo.findOne({
-        where: { id: dto.doctorId },
-      });
-      if (!doctor) {
-        throw new BadRequestException(`Doctor ${dto.doctorId} not found`);
-      }
-      assertClinicMatch(doctor.clinicId, cid);
+      await this.authz.assertPatientInClinic(dto.patientId, cid);
     }
 
     Object.assign(consultation, dto);
@@ -175,13 +150,17 @@ export class ConsultationsService {
   async remove(
     id: string,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: Consultation }> {
     const cid = requireClinicId(clinicId);
     const consultation = await this.consultationRepo.findOne({ where: { id } });
     if (!consultation) {
       throw new NotFoundException(`Consultation with id ${id} not found`);
     }
-    assertClinicMatch(consultation.clinicId, cid);
+    await this.authz.assertOwnership(
+      { type: 'consultation', entity: consultation },
+      actor,
+    );
     await this.consultationRepo.remove(consultation);
     return { data: consultation };
   }

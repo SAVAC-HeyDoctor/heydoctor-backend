@@ -5,31 +5,29 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { LabOrder, Patient, Doctor } from '../../entities';
+import { LabOrder } from '../../entities';
 import { CreateLabOrderDto } from './dto/create-lab-order.dto';
 import { UpdateLabOrderDto } from './dto/update-lab-order.dto';
 import { LabOrderFiltersDto } from './dto/lab-order-filters.dto';
-import {
-  assertClinicMatch,
-  requireClinicId,
-} from '../../common/utils/clinic-scope.util';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Injectable()
 export class LabOrdersService {
   constructor(
     @InjectRepository(LabOrder)
     private readonly labOrderRepo: Repository<LabOrder>,
-    @InjectRepository(Patient)
-    private readonly patientRepo: Repository<Patient>,
-    @InjectRepository(Doctor)
-    private readonly doctorRepo: Repository<Doctor>,
+    private readonly authz: AuthorizationService,
   ) {}
 
   async findAll(
     clinicId: string | undefined | null,
-    filters?: LabOrderFiltersDto,
+    filters: LabOrderFiltersDto | undefined,
+    actor: AuthActor,
   ): Promise<{ data: LabOrder[]; total: number }> {
     const cid = requireClinicId(clinicId);
+    const doctor = await this.authz.resolveDoctorForUser(actor.userId, cid);
     const qb = this.labOrderRepo
       .createQueryBuilder('l')
       .leftJoinAndSelect('l.patient', 'patient')
@@ -37,15 +35,13 @@ export class LabOrdersService {
       .leftJoinAndSelect('l.clinic', 'clinic')
       .leftJoinAndSelect('l.consultation', 'consultation')
       .leftJoinAndSelect('l.diagnosis', 'diagnosis')
-      .where('l.clinicId = :clinicId', { clinicId: cid });
+      .where('l.clinicId = :clinicId', { clinicId: cid })
+      .andWhere('l.doctorId = :doctorId', { doctorId: doctor.id });
 
     if (filters?.patientId) {
       qb.andWhere('l.patientId = :patientId', {
         patientId: filters.patientId,
       });
-    }
-    if (filters?.doctorId) {
-      qb.andWhere('l.doctorId = :doctorId', { doctorId: filters.doctorId });
     }
     if (filters?.consultationId) {
       qb.andWhere('l.consultationId = :consultationId', {
@@ -70,8 +66,8 @@ export class LabOrdersService {
   async findOne(
     id: string,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: LabOrder }> {
-    const cid = requireClinicId(clinicId);
     const order = await this.labOrderRepo.findOne({
       where: { id },
       relations: [
@@ -85,27 +81,21 @@ export class LabOrdersService {
     if (!order) {
       throw new NotFoundException(`Lab order with id ${id} not found`);
     }
-    assertClinicMatch(order.clinicId, cid);
+    await this.authz.assertOwnership(
+      { type: 'lab_order', entity: order },
+      actor,
+    );
     return { data: order };
   }
 
-  async create(
-    clinicId: string,
-    doctorId: string,
-    dto: CreateLabOrderDto,
-  ) {
-    const cid = requireClinicId(clinicId);
-    const patient = await this.patientRepo.findOne({
-      where: { id: dto.patientId },
-    });
-    if (!patient) {
-      throw new BadRequestException(`Patient ${dto.patientId} not found`);
-    }
-    assertClinicMatch(patient.clinicId, cid);
+  async create(dto: CreateLabOrderDto, actor: AuthActor) {
+    const cid = requireClinicId(actor.clinicId);
+    const doctor = await this.authz.resolveDoctorForUser(actor.userId, cid);
+    await this.authz.assertPatientInClinic(dto.patientId, cid);
 
     const order = this.labOrderRepo.create({
       clinicId: cid,
-      doctorId,
+      doctorId: doctor.id,
       patientId: dto.patientId,
       consultationId: dto.consultationId ?? null,
       diagnosisId: dto.diagnosisId ?? null,
@@ -123,31 +113,23 @@ export class LabOrdersService {
     id: string,
     dto: UpdateLabOrderDto,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: LabOrder }> {
     const cid = requireClinicId(clinicId);
     const order = await this.labOrderRepo.findOne({ where: { id } });
     if (!order) {
       throw new NotFoundException(`Lab order with id ${id} not found`);
     }
-    assertClinicMatch(order.clinicId, cid);
+    await this.authz.assertOwnership(
+      { type: 'lab_order', entity: order },
+      actor,
+    );
 
     if (dto.patientId) {
-      const patient = await this.patientRepo.findOne({
-        where: { id: dto.patientId },
-      });
-      if (!patient) {
-        throw new BadRequestException(`Patient ${dto.patientId} not found`);
-      }
-      assertClinicMatch(patient.clinicId, cid);
+      await this.authz.assertPatientInClinic(dto.patientId, cid);
     }
     if (dto.doctorId) {
-      const doctor = await this.doctorRepo.findOne({
-        where: { id: dto.doctorId },
-      });
-      if (!doctor) {
-        throw new BadRequestException(`Doctor ${dto.doctorId} not found`);
-      }
-      assertClinicMatch(doctor.clinicId, cid);
+      throw new BadRequestException('Cannot reassign ordering doctor via API');
     }
 
     Object.assign(order, dto);
@@ -159,13 +141,16 @@ export class LabOrdersService {
   async remove(
     id: string,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: LabOrder }> {
-    const cid = requireClinicId(clinicId);
     const order = await this.labOrderRepo.findOne({ where: { id } });
     if (!order) {
       throw new NotFoundException(`Lab order with id ${id} not found`);
     }
-    assertClinicMatch(order.clinicId, cid);
+    await this.authz.assertOwnership(
+      { type: 'lab_order', entity: order },
+      actor,
+    );
     await this.labOrderRepo.remove(order);
     return { data: order };
   }
@@ -173,15 +158,11 @@ export class LabOrdersService {
   async getByPatient(
     patientId: string,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ) {
     const cid = requireClinicId(clinicId);
-    const patient = await this.patientRepo.findOne({
-      where: { id: patientId },
-    });
-    if (!patient) {
-      throw new NotFoundException('Patient not found');
-    }
-    assertClinicMatch(patient.clinicId, cid);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+    await this.authz.assertPatientInClinic(patientId, cid);
 
     const orders = await this.labOrderRepo.find({
       where: { patientId, clinicId: cid },
@@ -191,7 +172,8 @@ export class LabOrdersService {
     return { data: orders };
   }
 
-  async suggestTests(query: string) {
+  async suggestTests(query: string, actor: AuthActor) {
+    await this.authz.resolveDoctorForUser(actor.userId, actor.clinicId);
     const commonTests = [
       'Hemograma completo',
       'Glucosa en ayunas',

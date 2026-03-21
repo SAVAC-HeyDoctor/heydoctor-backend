@@ -8,10 +8,6 @@ export class PrescriptionFiltersDto {
 
   @IsOptional()
   @IsUUID()
-  doctorId?: string;
-
-  @IsOptional()
-  @IsUUID()
   consultationId?: string;
 
   @IsOptional()

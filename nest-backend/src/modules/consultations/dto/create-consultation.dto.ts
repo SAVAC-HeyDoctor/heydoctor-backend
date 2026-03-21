@@ -14,9 +14,6 @@ export class CreateConsultationDto {
   @IsUUID()
   patientId: string;
 
-  @IsUUID()
-  doctorId: string;
-
   @IsOptional()
   @IsUUID()
   clinicalRecordId?: string;

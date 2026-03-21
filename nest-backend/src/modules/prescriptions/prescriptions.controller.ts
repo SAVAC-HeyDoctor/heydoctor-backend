@@ -7,7 +7,6 @@ import {
   Param,
   Body,
   Query,
-  ForbiddenException,
 } from '@nestjs/common';
 import { PrescriptionsService } from './prescriptions.service';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
@@ -15,42 +14,65 @@ import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import { PrescriptionFiltersDto } from './dto/prescription-filters.dto';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Doctor } from '../../entities';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Controller('prescriptions')
 export class PrescriptionsController {
-  constructor(
-    private readonly prescriptionsService: PrescriptionsService,
-    @InjectRepository(Doctor)
-    private readonly doctorRepo: Repository<Doctor>,
-  ) {}
+  constructor(private readonly prescriptionsService: PrescriptionsService) {}
+
+  private actor(userId: string, clinicId: string): AuthActor {
+    return { userId, clinicId };
+  }
 
   @Get()
   async findAll(
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
     @Query() filters: PrescriptionFiltersDto,
   ) {
-    return this.prescriptionsService.findAll(clinicId, filters);
+    return this.prescriptionsService.findAll(
+      clinicId,
+      filters,
+      this.actor(userId, clinicId),
+    );
   }
 
   @Get('patient/:patientId')
   async getByPatient(
     @Param('patientId') patientId: string,
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
   ) {
-    return this.prescriptionsService.getByPatient(patientId, clinicId);
+    return this.prescriptionsService.getByPatient(
+      patientId,
+      clinicId,
+      this.actor(userId, clinicId),
+    );
   }
 
   @Get('suggest-medications')
-  async suggestMedications(@Query('q') q: string) {
-    return this.prescriptionsService.suggestMedications(q || '');
+  async suggestMedications(
+    @Query('q') q: string,
+    @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.prescriptionsService.suggestMedications(
+      q || '',
+      this.actor(userId, clinicId),
+    );
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @ClinicId() clinicId: string) {
-    return this.prescriptionsService.findOne(id, clinicId);
+  async findOne(
+    @Param('id') id: string,
+    @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.prescriptionsService.findOne(
+      id,
+      clinicId,
+      this.actor(userId, clinicId),
+    );
   }
 
   @Post()
@@ -59,26 +81,34 @@ export class PrescriptionsController {
     @CurrentUser('userId') userId: string,
     @Body() dto: CreatePrescriptionDto,
   ) {
-    const doctor = await this.doctorRepo.findOne({
-      where: { userId, clinicId },
-    });
-    if (!doctor) {
-      throw new ForbiddenException('Doctor not found for this clinic');
-    }
-    return this.prescriptionsService.create(clinicId, doctor.id, dto);
+    return this.prescriptionsService.create(dto, this.actor(userId, clinicId));
   }
 
   @Patch(':id')
   async update(
     @Param('id') id: string,
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
     @Body() dto: UpdatePrescriptionDto,
   ) {
-    return this.prescriptionsService.update(id, dto, clinicId);
+    return this.prescriptionsService.update(
+      id,
+      dto,
+      clinicId,
+      this.actor(userId, clinicId),
+    );
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string, @ClinicId() clinicId: string) {
-    return this.prescriptionsService.remove(id, clinicId);
+  async remove(
+    @Param('id') id: string,
+    @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.prescriptionsService.remove(
+      id,
+      clinicId,
+      this.actor(userId, clinicId),
+    );
   }
 }

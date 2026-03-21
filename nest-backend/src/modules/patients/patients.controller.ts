@@ -13,7 +13,9 @@ import { ClinicService } from '../clinic/clinic.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PatientFiltersDto } from '../clinic/dto/patient-filters.dto';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Controller('patients')
 export class PatientsController {
@@ -22,46 +24,63 @@ export class PatientsController {
     private readonly clinicService: ClinicService,
   ) {}
 
+  private actor(userId: string, clinicId: string): AuthActor {
+    return { userId, clinicId };
+  }
+
   @Get()
   async findAll(
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
     @Query() filters: PatientFiltersDto,
   ) {
-    return this.patientsService.findAll(clinicId, filters);
+    return this.patientsService.findAll(clinicId, filters, this.actor(userId, clinicId));
   }
 
   @Get(':id/medical-record')
   async getMedicalRecord(
     @Param('id') patientId: string,
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
   ) {
+    await this.patientsService.findOne(patientId, clinicId, this.actor(userId, clinicId));
     return this.clinicService.getPatientMedicalRecord(patientId, clinicId);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @ClinicId() clinicId: string) {
-    return this.patientsService.findOne(id, clinicId);
+  async findOne(
+    @Param('id') id: string,
+    @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.patientsService.findOne(id, clinicId, this.actor(userId, clinicId));
   }
 
   @Post()
   async create(
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
     @Body() dto: CreatePatientDto,
   ) {
-    return this.patientsService.create(dto, clinicId);
+    return this.patientsService.create(dto, clinicId, this.actor(userId, clinicId));
   }
 
   @Patch(':id')
   async update(
     @Param('id') id: string,
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
     @Body() dto: UpdatePatientDto,
   ) {
-    return this.patientsService.update(id, dto, clinicId);
+    return this.patientsService.update(id, dto, clinicId, this.actor(userId, clinicId));
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string, @ClinicId() clinicId: string) {
-    return this.patientsService.remove(id, clinicId);
+  async remove(
+    @Param('id') id: string,
+    @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.patientsService.remove(id, clinicId, this.actor(userId, clinicId));
   }
 }

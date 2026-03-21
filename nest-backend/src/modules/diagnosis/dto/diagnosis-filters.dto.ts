@@ -11,10 +11,6 @@ export class DiagnosisFiltersDto {
   patientId?: string;
 
   @IsOptional()
-  @IsUUID()
-  doctorId?: string;
-
-  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(100)

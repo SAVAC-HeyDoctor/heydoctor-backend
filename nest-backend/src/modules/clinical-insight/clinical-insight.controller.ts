@@ -1,6 +1,8 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ClinicalInsightService } from './clinical-insight.service';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Controller('clinical-insight')
 export class ClinicalInsightController {
@@ -10,10 +12,9 @@ export class ClinicalInsightController {
   async getPatientInsight(
     @Param('id') patientId: string,
     @ClinicId() clinicId: string,
+    @CurrentUser('userId') userId: string,
   ) {
-    if (!clinicId) {
-      return { data: null };
-    }
-    return this.service.getPatientInsight(patientId, clinicId);
+    const actor: AuthActor = { userId, clinicId };
+    return this.service.getPatientInsight(patientId, clinicId, actor);
   }
 }

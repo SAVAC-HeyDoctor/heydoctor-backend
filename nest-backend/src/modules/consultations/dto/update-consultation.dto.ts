@@ -17,10 +17,6 @@ export class UpdateConsultationDto {
 
   @IsOptional()
   @IsUUID()
-  doctorId?: string;
-
-  @IsOptional()
-  @IsUUID()
   clinicalRecordId?: string;
 
   @IsOptional()

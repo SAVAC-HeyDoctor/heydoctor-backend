@@ -5,14 +5,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Prescription, Medication, Patient, Doctor } from '../../entities';
+import { Prescription, Medication } from '../../entities';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import { PrescriptionFiltersDto } from './dto/prescription-filters.dto';
-import {
-  assertClinicMatch,
-  requireClinicId,
-} from '../../common/utils/clinic-scope.util';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Injectable()
 export class PrescriptionsService {
@@ -21,17 +20,16 @@ export class PrescriptionsService {
     private readonly prescriptionRepo: Repository<Prescription>,
     @InjectRepository(Medication)
     private readonly medicationRepo: Repository<Medication>,
-    @InjectRepository(Patient)
-    private readonly patientRepo: Repository<Patient>,
-    @InjectRepository(Doctor)
-    private readonly doctorRepo: Repository<Doctor>,
+    private readonly authz: AuthorizationService,
   ) {}
 
   async findAll(
     clinicId: string | undefined | null,
-    filters?: PrescriptionFiltersDto,
+    filters: PrescriptionFiltersDto | undefined,
+    actor: AuthActor,
   ): Promise<{ data: Prescription[]; total: number }> {
     const cid = requireClinicId(clinicId);
+    const doctor = await this.authz.resolveDoctorForUser(actor.userId, cid);
     const qb = this.prescriptionRepo
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.patient', 'patient')
@@ -39,15 +37,13 @@ export class PrescriptionsService {
       .leftJoinAndSelect('p.clinic', 'clinic')
       .leftJoinAndSelect('p.consultation', 'consultation')
       .leftJoinAndSelect('p.diagnosis', 'diagnosis')
-      .where('p.clinicId = :clinicId', { clinicId: cid });
+      .where('p.clinicId = :clinicId', { clinicId: cid })
+      .andWhere('p.doctorId = :doctorId', { doctorId: doctor.id });
 
     if (filters?.patientId) {
       qb.andWhere('p.patientId = :patientId', {
         patientId: filters.patientId,
       });
-    }
-    if (filters?.doctorId) {
-      qb.andWhere('p.doctorId = :doctorId', { doctorId: filters.doctorId });
     }
     if (filters?.consultationId) {
       qb.andWhere('p.consultationId = :consultationId', {
@@ -72,8 +68,8 @@ export class PrescriptionsService {
   async findOne(
     id: string,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: Prescription }> {
-    const cid = requireClinicId(clinicId);
     const prescription = await this.prescriptionRepo.findOne({
       where: { id },
       relations: [
@@ -87,27 +83,21 @@ export class PrescriptionsService {
     if (!prescription) {
       throw new NotFoundException(`Prescription with id ${id} not found`);
     }
-    assertClinicMatch(prescription.clinicId, cid);
+    await this.authz.assertOwnership(
+      { type: 'prescription', entity: prescription },
+      actor,
+    );
     return { data: prescription };
   }
 
-  async create(
-    clinicId: string,
-    doctorId: string,
-    dto: CreatePrescriptionDto,
-  ) {
-    const cid = requireClinicId(clinicId);
-    const patient = await this.patientRepo.findOne({
-      where: { id: dto.patientId },
-    });
-    if (!patient) {
-      throw new BadRequestException(`Patient ${dto.patientId} not found`);
-    }
-    assertClinicMatch(patient.clinicId, cid);
+  async create(dto: CreatePrescriptionDto, actor: AuthActor) {
+    const cid = requireClinicId(actor.clinicId);
+    const doctor = await this.authz.resolveDoctorForUser(actor.userId, cid);
+    await this.authz.assertPatientInClinic(dto.patientId, cid);
 
     const prescription = this.prescriptionRepo.create({
       clinicId: cid,
-      doctorId,
+      doctorId: doctor.id,
       patientId: dto.patientId,
       consultationId: dto.consultationId ?? null,
       diagnosisId: dto.diagnosisId ?? null,
@@ -124,31 +114,23 @@ export class PrescriptionsService {
     id: string,
     dto: UpdatePrescriptionDto,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: Prescription }> {
     const cid = requireClinicId(clinicId);
     const prescription = await this.prescriptionRepo.findOne({ where: { id } });
     if (!prescription) {
       throw new NotFoundException(`Prescription with id ${id} not found`);
     }
-    assertClinicMatch(prescription.clinicId, cid);
+    await this.authz.assertOwnership(
+      { type: 'prescription', entity: prescription },
+      actor,
+    );
 
     if (dto.patientId) {
-      const patient = await this.patientRepo.findOne({
-        where: { id: dto.patientId },
-      });
-      if (!patient) {
-        throw new BadRequestException(`Patient ${dto.patientId} not found`);
-      }
-      assertClinicMatch(patient.clinicId, cid);
+      await this.authz.assertPatientInClinic(dto.patientId, cid);
     }
     if (dto.doctorId) {
-      const doctor = await this.doctorRepo.findOne({
-        where: { id: dto.doctorId },
-      });
-      if (!doctor) {
-        throw new BadRequestException(`Doctor ${dto.doctorId} not found`);
-      }
-      assertClinicMatch(doctor.clinicId, cid);
+      throw new BadRequestException('Cannot reassign prescribing doctor via API');
     }
 
     Object.assign(prescription, dto);
@@ -160,13 +142,16 @@ export class PrescriptionsService {
   async remove(
     id: string,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: Prescription }> {
-    const cid = requireClinicId(clinicId);
     const prescription = await this.prescriptionRepo.findOne({ where: { id } });
     if (!prescription) {
       throw new NotFoundException(`Prescription with id ${id} not found`);
     }
-    assertClinicMatch(prescription.clinicId, cid);
+    await this.authz.assertOwnership(
+      { type: 'prescription', entity: prescription },
+      actor,
+    );
     await this.prescriptionRepo.remove(prescription);
     return { data: prescription };
   }
@@ -174,15 +159,11 @@ export class PrescriptionsService {
   async getByPatient(
     patientId: string,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ) {
     const cid = requireClinicId(clinicId);
-    const patient = await this.patientRepo.findOne({
-      where: { id: patientId },
-    });
-    if (!patient) {
-      throw new NotFoundException('Patient not found');
-    }
-    assertClinicMatch(patient.clinicId, cid);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+    await this.authz.assertPatientInClinic(patientId, cid);
 
     const prescriptions = await this.prescriptionRepo.find({
       where: { patientId, clinicId: cid },
@@ -192,7 +173,8 @@ export class PrescriptionsService {
     return { data: prescriptions };
   }
 
-  async suggestMedications(query: string) {
+  async suggestMedications(query: string, actor: AuthActor) {
+    await this.authz.resolveDoctorForUser(actor.userId, actor.clinicId);
     if (!query || query.length < 2) {
       const meds = await this.medicationRepo.find({ take: 15 });
       return { data: meds.map((m) => m.name) };

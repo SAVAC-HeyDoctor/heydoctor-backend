@@ -21,6 +21,8 @@ import {
 } from '../../entities/ai-insight.entity';
 import { GenerateInsightsDto } from './dto/generate-insights.dto';
 import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 interface AiInsightsResponse {
   predicted_conditions: PredictedCondition[];
@@ -45,20 +47,18 @@ export class AiInsightsService {
     @InjectRepository(Prescription)
     private readonly prescriptionRepo: Repository<Prescription>,
     private readonly openai: OpenAIService,
+    private readonly authz: AuthorizationService,
   ) {}
 
   async getByPatient(
     patientId: string,
     clinicId: string | undefined | null,
-    limit = 10,
+    limit: number,
+    actor: AuthActor,
   ): Promise<{ data: AiInsight[] }> {
     const cid = requireClinicId(clinicId);
-    const patient = await this.patientRepo.findOne({
-      where: { id: patientId, clinicId: cid },
-    });
-    if (!patient) {
-      throw new NotFoundException('Patient not found');
-    }
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+    await this.authz.assertPatientInClinic(patientId, cid);
 
     const qb = this.aiInsightRepo
       .createQueryBuilder('a')
@@ -76,14 +76,31 @@ export class AiInsightsService {
   async generate(
     dto: GenerateInsightsDto,
     clinicId: string | undefined | null,
+    actor: AuthActor,
   ): Promise<{ data: AiInsight }> {
     const cid = requireClinicId(clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+    await this.authz.assertPatientInClinic(dto.patientId, cid);
+
     const patient = await this.patientRepo.findOne({
       where: { id: dto.patientId, clinicId: cid },
       relations: ['clinical_record'],
     });
     if (!patient) {
       throw new NotFoundException('Patient not found');
+    }
+
+    if (dto.consultationId) {
+      const consultation = await this.consultationRepo.findOne({
+        where: { id: dto.consultationId },
+      });
+      if (!consultation) {
+        throw new NotFoundException('Consultation not found');
+      }
+      await this.authz.assertOwnership(
+        { type: 'consultation', entity: consultation },
+        actor,
+      );
     }
 
     const clinicalContext = await this.buildClinicalContext(

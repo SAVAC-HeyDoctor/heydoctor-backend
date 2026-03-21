@@ -1,22 +1,34 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PatientReminder, Patient } from '../../entities';
+import { PatientReminder } from '../../entities';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
+import { AuthorizationService } from '../../common/services/authorization.service';
+import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
 
 @Injectable()
 export class PatientRemindersService {
   constructor(
     @InjectRepository(PatientReminder)
     private readonly reminderRepo: Repository<PatientReminder>,
-    @InjectRepository(Patient)
-    private readonly patientRepo: Repository<Patient>,
+    private readonly authz: AuthorizationService,
   ) {}
 
-  async findAll(clinicId: string, patientId?: string) {
+  async findAll(
+    clinicId: string | undefined | null,
+    patientId: string | undefined,
+    actor: AuthActor,
+  ) {
+    const cid = requireClinicId(clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+    if (patientId) {
+      await this.authz.assertPatientInClinic(patientId, cid);
+    }
+
     const qb = this.reminderRepo
       .createQueryBuilder('r')
       .leftJoin('r.patient', 'p')
-      .where('p.clinicId = :clinicId', { clinicId });
+      .where('p.clinicId = :clinicId', { clinicId: cid });
 
     if (patientId) {
       qb.andWhere('r.patientId = :patientId', { patientId });
@@ -31,15 +43,13 @@ export class PatientRemindersService {
   }
 
   async create(
-    clinicId: string,
+    clinicId: string | undefined | null,
     dto: { patientId: string; reminderType: string; dueDate: string; notes?: string },
+    actor: AuthActor,
   ) {
-    const patient = await this.patientRepo.findOne({
-      where: { id: dto.patientId, clinicId },
-    });
-    if (!patient) {
-      throw new NotFoundException('Patient not found');
-    }
+    const cid = requireClinicId(clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+    await this.authz.assertPatientInClinic(dto.patientId, cid);
 
     const reminder = this.reminderRepo.create({
       patientId: dto.patientId,
@@ -53,14 +63,18 @@ export class PatientRemindersService {
 
   async update(
     id: string,
-    clinicId: string,
+    clinicId: string | undefined | null,
     dto: { reminderType?: string; dueDate?: string; status?: string; notes?: string },
+    actor: AuthActor,
   ) {
+    const cid = requireClinicId(clinicId);
+    await this.authz.resolveDoctorForUser(actor.userId, cid);
+
     const reminder = await this.reminderRepo
       .createQueryBuilder('r')
       .leftJoin('r.patient', 'p')
       .where('r.id = :id', { id })
-      .andWhere('p.clinicId = :clinicId', { clinicId })
+      .andWhere('p.clinicId = :clinicId', { clinicId: cid })
       .getOne();
 
     if (!reminder) {
