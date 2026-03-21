@@ -19,10 +19,6 @@ export class CreateDiagnosisDto {
 
   @IsOptional()
   @IsUUID()
-  clinicId?: string;
-
-  @IsOptional()
-  @IsUUID()
   cie10CodeId?: string;
 
   @IsDateString()

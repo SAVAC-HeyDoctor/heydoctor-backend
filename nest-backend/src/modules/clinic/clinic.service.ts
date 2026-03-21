@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -104,9 +105,13 @@ export class ClinicService {
     return { data: items, total };
   }
 
-  async getPatientMedicalRecord(patientId: string, clinicId: string) {
+  async getPatientMedicalRecord(
+    patientId: string,
+    clinicId: string | undefined | null,
+  ) {
+    const cid = requireClinicId(clinicId);
     const patient = await this.patientRepo.findOne({
-      where: { id: patientId, clinicId },
+      where: { id: patientId, clinicId: cid },
       relations: ['clinical_record', 'clinical_record.diagnostics', 'clinical_record.treatments', 'clinical_record.doctor', 'clinical_record.doctor.user'],
     });
     if (!patient) {
@@ -114,7 +119,7 @@ export class ClinicService {
     }
 
     const records = await this.clinicalRecordRepo.find({
-      where: { patientId, clinicId },
+      where: { patientId, clinicId: cid },
       relations: ['diagnostics', 'treatments', 'doctor', 'doctor.user'],
       order: { consultationDate: 'DESC' },
     });

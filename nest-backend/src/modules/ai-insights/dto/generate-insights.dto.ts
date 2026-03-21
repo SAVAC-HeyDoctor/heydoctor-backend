@@ -8,10 +8,6 @@ export class GenerateInsightsDto {
   @IsUUID()
   consultationId?: string;
 
-  @IsOptional()
-  @IsUUID()
-  clinicId?: string;
-
   /** Symptoms or clinical context for AI analysis. */
   @IsOptional()
   @IsString()

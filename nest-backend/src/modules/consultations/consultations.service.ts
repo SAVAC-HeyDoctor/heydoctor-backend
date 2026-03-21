@@ -1,24 +1,35 @@
 import {
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Consultation } from '../../entities';
+import { Consultation, Patient, Doctor } from '../../entities';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
 import { ConsultationFiltersDto } from './dto/consultation-filters.dto';
+import {
+  assertClinicMatch,
+  requireClinicId,
+} from '../../common/utils/clinic-scope.util';
 
 @Injectable()
 export class ConsultationsService {
   constructor(
     @InjectRepository(Consultation)
     private readonly consultationRepo: Repository<Consultation>,
+    @InjectRepository(Patient)
+    private readonly patientRepo: Repository<Patient>,
+    @InjectRepository(Doctor)
+    private readonly doctorRepo: Repository<Doctor>,
   ) {}
 
   async findAll(
+    clinicId: string | undefined | null,
     filters?: ConsultationFiltersDto,
   ): Promise<{ data: Consultation[]; total: number }> {
+    const cid = requireClinicId(clinicId);
     const qb = this.consultationRepo
       .createQueryBuilder('c')
       .leftJoinAndSelect('c.patient', 'patient')
@@ -27,16 +38,14 @@ export class ConsultationsService {
       .leftJoinAndSelect('c.clinical_record', 'clinical_record')
       .leftJoinAndSelect('c.diagnostic', 'diagnostic')
       .leftJoinAndSelect('c.lab_orders', 'lab_orders')
-      .leftJoinAndSelect('c.prescriptions', 'prescriptions');
+      .leftJoinAndSelect('c.prescriptions', 'prescriptions')
+      .where('c.clinicId = :clinicId', { clinicId: cid });
 
     if (filters?.patientId) {
       qb.andWhere('c.patientId = :patientId', { patientId: filters.patientId });
     }
     if (filters?.doctorId) {
       qb.andWhere('c.doctorId = :doctorId', { doctorId: filters.doctorId });
-    }
-    if (filters?.clinicId) {
-      qb.andWhere('c.clinicId = :clinicId', { clinicId: filters.clinicId });
     }
     if (filters?.status) {
       qb.andWhere('c.status = :status', { status: filters.status });
@@ -57,7 +66,11 @@ export class ConsultationsService {
     return { data: items, total };
   }
 
-  async findOne(id: string): Promise<{ data: Consultation }> {
+  async findOne(
+    id: string,
+    clinicId: string | undefined | null,
+  ): Promise<{ data: Consultation }> {
+    const cid = requireClinicId(clinicId);
     const consultation = await this.consultationRepo.findOne({
       where: { id },
       relations: [
@@ -68,7 +81,6 @@ export class ConsultationsService {
         'diagnostic',
         'diagnostic.cie_10_code',
         'lab_orders',
-        'lab_orders',
         'lab_orders.diagnosis',
         'prescriptions',
         'prescriptions.diagnosis',
@@ -77,16 +89,43 @@ export class ConsultationsService {
     if (!consultation) {
       throw new NotFoundException(`Consultation with id ${id} not found`);
     }
+    assertClinicMatch(consultation.clinicId, cid);
     return { data: consultation };
   }
 
-  async create(dto: CreateConsultationDto): Promise<{ data: Consultation }> {
+  async create(
+    dto: CreateConsultationDto,
+    clinicId: string | undefined | null,
+  ): Promise<{ data: Consultation }> {
+    const cid = requireClinicId(clinicId);
+    const patient = await this.patientRepo.findOne({
+      where: { id: dto.patientId },
+    });
+    if (!patient) {
+      throw new BadRequestException(`Patient ${dto.patientId} not found`);
+    }
+    assertClinicMatch(patient.clinicId, cid);
+
+    const doctor = await this.doctorRepo.findOne({
+      where: { id: dto.doctorId },
+    });
+    if (!doctor) {
+      throw new BadRequestException(`Doctor ${dto.doctorId} not found`);
+    }
+    assertClinicMatch(doctor.clinicId, cid);
+
     const consultation = this.consultationRepo.create({
-      ...dto,
+      patientId: dto.patientId,
+      doctorId: dto.doctorId,
+      clinicId: cid,
+      clinicalRecordId: dto.clinicalRecordId ?? null,
       date: new Date(dto.date),
       duration: dto.duration ?? 45,
       status: dto.status ?? 'scheduled',
       confirmed: dto.confirmed ?? false,
+      appointment_reason: dto.appointment_reason ?? null,
+      notes: dto.notes ?? null,
+      files: dto.files ?? null,
       active: dto.active ?? true,
     });
     const saved = await this.consultationRepo.save(consultation);
@@ -96,12 +135,36 @@ export class ConsultationsService {
   async update(
     id: string,
     dto: UpdateConsultationDto,
+    clinicId: string | undefined | null,
   ): Promise<{ data: Consultation }> {
+    const cid = requireClinicId(clinicId);
     const consultation = await this.consultationRepo.findOne({ where: { id } });
     if (!consultation) {
       throw new NotFoundException(`Consultation with id ${id} not found`);
     }
+    assertClinicMatch(consultation.clinicId, cid);
+
+    if (dto.patientId) {
+      const patient = await this.patientRepo.findOne({
+        where: { id: dto.patientId },
+      });
+      if (!patient) {
+        throw new BadRequestException(`Patient ${dto.patientId} not found`);
+      }
+      assertClinicMatch(patient.clinicId, cid);
+    }
+    if (dto.doctorId) {
+      const doctor = await this.doctorRepo.findOne({
+        where: { id: dto.doctorId },
+      });
+      if (!doctor) {
+        throw new BadRequestException(`Doctor ${dto.doctorId} not found`);
+      }
+      assertClinicMatch(doctor.clinicId, cid);
+    }
+
     Object.assign(consultation, dto);
+    consultation.clinicId = cid;
     if (dto.date) {
       consultation.date = new Date(dto.date);
     }
@@ -109,11 +172,16 @@ export class ConsultationsService {
     return { data: saved };
   }
 
-  async remove(id: string): Promise<{ data: Consultation }> {
+  async remove(
+    id: string,
+    clinicId: string | undefined | null,
+  ): Promise<{ data: Consultation }> {
+    const cid = requireClinicId(clinicId);
     const consultation = await this.consultationRepo.findOne({ where: { id } });
     if (!consultation) {
       throw new NotFoundException(`Consultation with id ${id} not found`);
     }
+    assertClinicMatch(consultation.clinicId, cid);
     await this.consultationRepo.remove(consultation);
     return { data: consultation };
   }

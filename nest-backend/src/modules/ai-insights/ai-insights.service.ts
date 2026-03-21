@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -21,6 +20,7 @@ import {
   RecommendedAction,
 } from '../../entities/ai-insight.entity';
 import { GenerateInsightsDto } from './dto/generate-insights.dto';
+import { requireClinicId } from '../../common/utils/clinic-scope.util';
 
 interface AiInsightsResponse {
   predicted_conditions: PredictedCondition[];
@@ -49,11 +49,12 @@ export class AiInsightsService {
 
   async getByPatient(
     patientId: string,
-    clinicId?: string,
+    clinicId: string | undefined | null,
     limit = 10,
   ): Promise<{ data: AiInsight[] }> {
+    const cid = requireClinicId(clinicId);
     const patient = await this.patientRepo.findOne({
-      where: { id: patientId },
+      where: { id: patientId, clinicId: cid },
     });
     if (!patient) {
       throw new NotFoundException('Patient not found');
@@ -64,14 +65,9 @@ export class AiInsightsService {
       .leftJoinAndSelect('a.patient', 'patient')
       .leftJoinAndSelect('a.consultation', 'consultation')
       .where('a.patientId = :patientId', { patientId })
+      .andWhere('a.clinicId = :clinicId', { clinicId: cid })
       .orderBy('a.createdAt', 'DESC')
       .take(limit);
-
-    if (clinicId) {
-      qb.andWhere('(a.clinicId = :clinicId OR a.clinicId IS NULL)', {
-        clinicId,
-      });
-    }
 
     const items = await qb.getMany();
     return { data: items };
@@ -79,10 +75,11 @@ export class AiInsightsService {
 
   async generate(
     dto: GenerateInsightsDto,
-    clinicId?: string,
+    clinicId: string | undefined | null,
   ): Promise<{ data: AiInsight }> {
+    const cid = requireClinicId(clinicId);
     const patient = await this.patientRepo.findOne({
-      where: { id: dto.patientId },
+      where: { id: dto.patientId, clinicId: cid },
       relations: ['clinical_record'],
     });
     if (!patient) {
@@ -92,7 +89,7 @@ export class AiInsightsService {
     const clinicalContext = await this.buildClinicalContext(
       dto.patientId,
       dto.consultationId,
-      clinicId ?? dto.clinicId ?? patient.clinicId ?? undefined,
+      cid,
     );
 
     const symptomsInput =
@@ -165,7 +162,7 @@ Return the JSON with clinical insights.`;
     const insight = this.aiInsightRepo.create({
       patientId: dto.patientId,
       consultationId: dto.consultationId ?? null,
-      clinicId: clinicId ?? dto.clinicId ?? patient.clinicId ?? null,
+      clinicId: cid,
       predicted_conditions: result.predicted_conditions,
       risk_scores: result.risk_scores,
       clinical_patterns: result.clinical_patterns,
@@ -178,8 +175,8 @@ Return the JSON with clinical insights.`;
 
   private async buildClinicalContext(
     patientId: string,
-    consultationId?: string,
-    clinicId?: string,
+    consultationId: string | undefined,
+    clinicId: string,
   ): Promise<{
     symptomsSummary: string;
     recordsSummary: string;
@@ -187,11 +184,9 @@ Return the JSON with clinical insights.`;
     prescriptionsSummary: string;
     diagnosesSummary: string;
   }> {
-    const recordWhere = clinicId
-      ? { patientId, clinicId }
-      : { patientId };
-    const labWhere = clinicId ? { patientId, clinicId } : { patientId };
-    const rxWhere = clinicId ? { patientId, clinicId } : { patientId };
+    const recordWhere = { patientId, clinicId };
+    const labWhere = { patientId, clinicId };
+    const rxWhere = { patientId, clinicId };
 
     const [records, labOrders, prescriptions, consultation] = await Promise.all(
       [
@@ -213,12 +208,16 @@ Return the JSON with clinical insights.`;
         }),
         consultationId
           ? this.consultationRepo.findOne({
-              where: { id: consultationId },
+              where: { id: consultationId, clinicId },
               relations: ['diagnostic'],
             })
           : null,
       ],
     );
+
+    if (consultationId && !consultation) {
+      throw new NotFoundException('Consultation not found');
+    }
 
     const symptomsFromRecords = records
       .map((r) => r.chiefComplaint || r.clinicalNote)
@@ -235,9 +234,10 @@ Return the JSON with clinical insights.`;
       : [];
 
     return {
-      symptomsSummary: [symptomsFromRecords, symptomsFromConsultation]
-        .filter(Boolean)
-        .join('. ') || 'Not documented',
+      symptomsSummary:
+        [symptomsFromRecords, symptomsFromConsultation]
+          .filter(Boolean)
+          .join('. ') || 'Not documented',
       recordsSummary: records.length
         ? `Recent records: ${records.length} clinical records. ${symptomsFromRecords || ''}`
         : '',

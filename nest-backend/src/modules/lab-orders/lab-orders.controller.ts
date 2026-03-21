@@ -7,6 +7,7 @@ import {
   Param,
   Body,
   Query,
+  ForbiddenException,
 } from '@nestjs/common';
 import { LabOrdersService } from './lab-orders.service';
 import { CreateLabOrderDto } from './dto/create-lab-order.dto';
@@ -27,8 +28,11 @@ export class LabOrdersController {
   ) {}
 
   @Get()
-  async findAll(@Query() filters: LabOrderFiltersDto) {
-    return this.labOrdersService.findAll(filters);
+  async findAll(
+    @ClinicId() clinicId: string,
+    @Query() filters: LabOrderFiltersDto,
+  ) {
+    return this.labOrdersService.findAll(clinicId, filters);
   }
 
   @Get('patient/:patientId')
@@ -36,9 +40,6 @@ export class LabOrdersController {
     @Param('patientId') patientId: string,
     @ClinicId() clinicId: string,
   ) {
-    if (!clinicId) {
-      return { data: [] };
-    }
     return this.labOrdersService.getByPatient(patientId, clinicId);
   }
 
@@ -48,8 +49,8 @@ export class LabOrdersController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.labOrdersService.findOne(id);
+  async findOne(@Param('id') id: string, @ClinicId() clinicId: string) {
+    return this.labOrdersService.findOne(id, clinicId);
   }
 
   @Post()
@@ -61,8 +62,8 @@ export class LabOrdersController {
     const doctor = await this.doctorRepo.findOne({
       where: { userId, clinicId },
     });
-    if (!doctor || !clinicId) {
-      return { data: null };
+    if (!doctor) {
+      throw new ForbiddenException('Doctor not found for this clinic');
     }
     return this.labOrdersService.create(clinicId, doctor.id, dto);
   }
@@ -70,13 +71,14 @@ export class LabOrdersController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
+    @ClinicId() clinicId: string,
     @Body() dto: UpdateLabOrderDto,
   ) {
-    return this.labOrdersService.update(id, dto);
+    return this.labOrdersService.update(id, dto, clinicId);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.labOrdersService.remove(id);
+  async remove(@Param('id') id: string, @ClinicId() clinicId: string) {
+    return this.labOrdersService.remove(id, clinicId);
   }
 }

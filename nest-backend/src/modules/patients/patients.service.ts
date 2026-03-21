@@ -9,6 +9,10 @@ import { Patient } from '../../entities';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PatientFiltersDto } from '../clinic/dto/patient-filters.dto';
+import {
+  assertClinicMatch,
+  requireClinicId,
+} from '../../common/utils/clinic-scope.util';
 
 @Injectable()
 export class PatientsService {
@@ -18,13 +22,13 @@ export class PatientsService {
   ) {}
 
   async findAll(
-    clinicId?: string,
+    clinicId: string | undefined | null,
     filters?: PatientFiltersDto,
   ): Promise<{ data: Patient[]; total?: number }> {
-    const qb = this.patientRepo.createQueryBuilder('p');
-    if (clinicId) {
-      qb.where('p.clinicId = :clinicId', { clinicId });
-    }
+    const cid = requireClinicId(clinicId);
+    const qb = this.patientRepo
+      .createQueryBuilder('p')
+      .where('p.clinicId = :clinicId', { clinicId: cid });
     if (filters?.search) {
       qb.andWhere(
         '(p.firstname ILIKE :search OR p.lastname ILIKE :search OR p.identification ILIKE :search)',
@@ -40,7 +44,11 @@ export class PatientsService {
     return { data: items, total };
   }
 
-  async findOne(id: string): Promise<{ data: Patient }> {
+  async findOne(
+    id: string,
+    clinicId: string | undefined | null,
+  ): Promise<{ data: Patient }> {
+    const cid = requireClinicId(clinicId);
     const patient = await this.patientRepo.findOne({
       where: { id },
       relations: ['clinic', 'user'],
@@ -48,12 +56,17 @@ export class PatientsService {
     if (!patient) {
       throw new NotFoundException(`Patient with id ${id} not found`);
     }
+    assertClinicMatch(patient.clinicId, cid);
     return { data: patient };
   }
 
-  async create(dto: CreatePatientDto): Promise<{ data: Patient }> {
+  async create(
+    dto: CreatePatientDto,
+    clinicId: string | undefined | null,
+  ): Promise<{ data: Patient }> {
+    const cid = requireClinicId(clinicId);
     const existing = await this.patientRepo.findOne({
-      where: { identification: dto.identification },
+      where: { identification: dto.identification, clinicId: cid },
     });
     if (existing) {
       throw new ConflictException(
@@ -62,20 +75,27 @@ export class PatientsService {
     }
     const patient = this.patientRepo.create({
       ...dto,
+      clinicId: cid,
       birth_date: new Date(dto.birth_date),
     });
     const saved = await this.patientRepo.save(patient);
     return { data: saved };
   }
 
-  async update(id: string, dto: UpdatePatientDto): Promise<{ data: Patient }> {
+  async update(
+    id: string,
+    dto: UpdatePatientDto,
+    clinicId: string | undefined | null,
+  ): Promise<{ data: Patient }> {
+    const cid = requireClinicId(clinicId);
     const patient = await this.patientRepo.findOne({ where: { id } });
     if (!patient) {
       throw new NotFoundException(`Patient with id ${id} not found`);
     }
+    assertClinicMatch(patient.clinicId, cid);
     if (dto.identification && dto.identification !== patient.identification) {
       const existing = await this.patientRepo.findOne({
-        where: { identification: dto.identification },
+        where: { identification: dto.identification, clinicId: cid },
       });
       if (existing) {
         throw new ConflictException(
@@ -87,15 +107,21 @@ export class PatientsService {
     if (dto.birth_date) {
       patient.birth_date = new Date(dto.birth_date);
     }
+    patient.clinicId = cid;
     const saved = await this.patientRepo.save(patient);
     return { data: saved };
   }
 
-  async remove(id: string): Promise<{ data: Patient }> {
+  async remove(
+    id: string,
+    clinicId: string | undefined | null,
+  ): Promise<{ data: Patient }> {
+    const cid = requireClinicId(clinicId);
     const patient = await this.patientRepo.findOne({ where: { id } });
     if (!patient) {
       throw new NotFoundException(`Patient with id ${id} not found`);
     }
+    assertClinicMatch(patient.clinicId, cid);
     await this.patientRepo.remove(patient);
     return { data: patient };
   }

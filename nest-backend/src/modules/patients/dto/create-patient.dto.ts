@@ -39,9 +39,5 @@ export class CreatePatientDto {
 
   @IsOptional()
   @IsString()
-  clinicId?: string;
-
-  @IsOptional()
-  @IsString()
   userId?: string;
 }

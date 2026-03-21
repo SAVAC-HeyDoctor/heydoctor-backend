@@ -16,7 +16,7 @@ export class AiInsightsController {
     const limitNum = limit ? parseInt(limit, 10) : 10;
     return this.aiInsightsService.getByPatient(
       patientId,
-      clinicId || undefined,
+      clinicId,
       isNaN(limitNum) ? 10 : Math.min(limitNum, 50),
     );
   }
@@ -26,6 +26,6 @@ export class AiInsightsController {
     @ClinicId() clinicId: string,
     @Body() dto: GenerateInsightsDto,
   ) {
-    return this.aiInsightsService.generate(dto, clinicId || undefined);
+    return this.aiInsightsService.generate(dto, clinicId);
   }
 }

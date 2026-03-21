@@ -19,10 +19,6 @@ export class ConsultationFiltersDto {
   doctorId?: string;
 
   @IsOptional()
-  @IsUUID()
-  clinicId?: string;
-
-  @IsOptional()
   @IsDateString()
   from?: string;
 

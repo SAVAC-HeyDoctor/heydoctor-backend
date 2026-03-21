@@ -20,10 +20,6 @@ export class UpdateDiagnosisDto {
 
   @IsOptional()
   @IsUUID()
-  clinicId?: string;
-
-  @IsOptional()
-  @IsUUID()
   cie10CodeId?: string;
 
   @IsOptional()

@@ -7,6 +7,7 @@ import {
   Param,
   Body,
   Query,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrescriptionsService } from './prescriptions.service';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
@@ -27,8 +28,11 @@ export class PrescriptionsController {
   ) {}
 
   @Get()
-  async findAll(@Query() filters: PrescriptionFiltersDto) {
-    return this.prescriptionsService.findAll(filters);
+  async findAll(
+    @ClinicId() clinicId: string,
+    @Query() filters: PrescriptionFiltersDto,
+  ) {
+    return this.prescriptionsService.findAll(clinicId, filters);
   }
 
   @Get('patient/:patientId')
@@ -36,9 +40,6 @@ export class PrescriptionsController {
     @Param('patientId') patientId: string,
     @ClinicId() clinicId: string,
   ) {
-    if (!clinicId) {
-      return { data: [] };
-    }
     return this.prescriptionsService.getByPatient(patientId, clinicId);
   }
 
@@ -48,8 +49,8 @@ export class PrescriptionsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.prescriptionsService.findOne(id);
+  async findOne(@Param('id') id: string, @ClinicId() clinicId: string) {
+    return this.prescriptionsService.findOne(id, clinicId);
   }
 
   @Post()
@@ -61,8 +62,8 @@ export class PrescriptionsController {
     const doctor = await this.doctorRepo.findOne({
       where: { userId, clinicId },
     });
-    if (!doctor || !clinicId) {
-      return { data: null };
+    if (!doctor) {
+      throw new ForbiddenException('Doctor not found for this clinic');
     }
     return this.prescriptionsService.create(clinicId, doctor.id, dto);
   }
@@ -70,13 +71,14 @@ export class PrescriptionsController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
+    @ClinicId() clinicId: string,
     @Body() dto: UpdatePrescriptionDto,
   ) {
-    return this.prescriptionsService.update(id, dto);
+    return this.prescriptionsService.update(id, dto, clinicId);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.prescriptionsService.remove(id);
+  async remove(@Param('id') id: string, @ClinicId() clinicId: string) {
+    return this.prescriptionsService.remove(id, clinicId);
   }
 }

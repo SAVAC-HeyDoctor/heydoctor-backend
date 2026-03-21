@@ -8,10 +8,6 @@ export class DiagnosisFiltersDto {
 
   @IsOptional()
   @IsUUID()
-  clinicId?: string;
-
-  @IsOptional()
-  @IsUUID()
   patientId?: string;
 
   @IsOptional()

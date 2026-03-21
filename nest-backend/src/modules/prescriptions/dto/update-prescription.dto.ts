@@ -43,10 +43,6 @@ export class UpdatePrescriptionDto {
 
   @IsOptional()
   @IsUUID()
-  clinicId?: string;
-
-  @IsOptional()
-  @IsUUID()
   consultationId?: string;
 
   @IsOptional()

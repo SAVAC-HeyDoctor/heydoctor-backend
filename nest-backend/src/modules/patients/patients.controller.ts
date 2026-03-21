@@ -27,7 +27,7 @@ export class PatientsController {
     @ClinicId() clinicId: string,
     @Query() filters: PatientFiltersDto,
   ) {
-    return this.patientsService.findAll(clinicId || undefined, filters);
+    return this.patientsService.findAll(clinicId, filters);
   }
 
   @Get(':id/medical-record')
@@ -35,29 +35,33 @@ export class PatientsController {
     @Param('id') patientId: string,
     @ClinicId() clinicId: string,
   ) {
-    if (!clinicId) {
-      return { data: null };
-    }
     return this.clinicService.getPatientMedicalRecord(patientId, clinicId);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.patientsService.findOne(id);
+  async findOne(@Param('id') id: string, @ClinicId() clinicId: string) {
+    return this.patientsService.findOne(id, clinicId);
   }
 
   @Post()
-  async create(@Body() dto: CreatePatientDto) {
-    return this.patientsService.create(dto);
+  async create(
+    @ClinicId() clinicId: string,
+    @Body() dto: CreatePatientDto,
+  ) {
+    return this.patientsService.create(dto, clinicId);
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdatePatientDto) {
-    return this.patientsService.update(id, dto);
+  async update(
+    @Param('id') id: string,
+    @ClinicId() clinicId: string,
+    @Body() dto: UpdatePatientDto,
+  ) {
+    return this.patientsService.update(id, dto, clinicId);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.patientsService.remove(id);
+  async remove(@Param('id') id: string, @ClinicId() clinicId: string) {
+    return this.patientsService.remove(id, clinicId);
   }
 }

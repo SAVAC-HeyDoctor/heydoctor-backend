@@ -12,14 +12,6 @@ export class CreateLabOrderDto {
 
   @IsOptional()
   @IsUUID()
-  doctorId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  clinicId?: string;
-
-  @IsOptional()
-  @IsUUID()
   consultationId?: string;
 
   @IsOptional()

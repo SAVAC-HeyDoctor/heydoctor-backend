@@ -43,9 +43,5 @@ export class UpdatePatientDto {
 
   @IsOptional()
   @IsString()
-  clinicId?: string;
-
-  @IsOptional()
-  @IsString()
   userId?: string;
 }

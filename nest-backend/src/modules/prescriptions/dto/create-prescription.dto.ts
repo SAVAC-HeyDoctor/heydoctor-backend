@@ -38,14 +38,6 @@ export class CreatePrescriptionDto {
 
   @IsOptional()
   @IsUUID()
-  doctorId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  clinicId?: string;
-
-  @IsOptional()
-  @IsUUID()
   consultationId?: string;
 
   @IsOptional()

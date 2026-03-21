@@ -9,6 +9,10 @@ import { Diagnosis, Consultation } from '../../entities';
 import { CreateDiagnosisDto } from './dto/create-diagnosis.dto';
 import { UpdateDiagnosisDto } from './dto/update-diagnosis.dto';
 import { DiagnosisFiltersDto } from './dto/diagnosis-filters.dto';
+import {
+  assertClinicMatch,
+  requireClinicId,
+} from '../../common/utils/clinic-scope.util';
 
 @Injectable()
 export class DiagnosisService {
@@ -19,20 +23,22 @@ export class DiagnosisService {
     private readonly consultationRepo: Repository<Consultation>,
   ) {}
 
-  async findAll(filters?: DiagnosisFiltersDto) {
+  async findAll(
+    clinicId: string | undefined | null,
+    filters?: DiagnosisFiltersDto,
+  ) {
+    const cid = requireClinicId(clinicId);
     const qb = this.diagnosisRepo
       .createQueryBuilder('d')
       .leftJoinAndSelect('d.consultation', 'consultation')
       .leftJoinAndSelect('d.cie_10_code', 'cie_10_code')
-      .leftJoinAndSelect('d.clinical_record', 'clinical_record');
+      .leftJoinAndSelect('d.clinical_record', 'clinical_record')
+      .where('d.clinicId = :clinicId', { clinicId: cid });
 
     if (filters?.consultationId) {
       qb.andWhere('d.consultationId = :consultationId', {
         consultationId: filters.consultationId,
       });
-    }
-    if (filters?.clinicId) {
-      qb.andWhere('d.clinicId = :clinicId', { clinicId: filters.clinicId });
     }
     if (filters?.patientId) {
       qb.andWhere('d.patientId = :patientId', { patientId: filters.patientId });
@@ -50,7 +56,8 @@ export class DiagnosisService {
     return { data: items, total };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, clinicId: string | undefined | null) {
+    const cid = requireClinicId(clinicId);
     const diagnosis = await this.diagnosisRepo.findOne({
       where: { id },
       relations: ['consultation', 'cie_10_code', 'clinical_record'],
@@ -58,10 +65,12 @@ export class DiagnosisService {
     if (!diagnosis) {
       throw new NotFoundException(`Diagnosis with id ${id} not found`);
     }
+    assertClinicMatch(diagnosis.clinicId, cid);
     return { data: diagnosis };
   }
 
-  async create(dto: CreateDiagnosisDto) {
+  async create(dto: CreateDiagnosisDto, clinicId: string | undefined | null) {
+    const cid = requireClinicId(clinicId);
     const consultation = await this.consultationRepo.findOne({
       where: { id: dto.consultationId },
     });
@@ -70,6 +79,7 @@ export class DiagnosisService {
         `Consultation ${dto.consultationId} not found`,
       );
     }
+    assertClinicMatch(consultation.clinicId, cid);
 
     const existing = await this.diagnosisRepo.findOne({
       where: { consultationId: dto.consultationId },
@@ -82,12 +92,13 @@ export class DiagnosisService {
 
     const diagnosis = this.diagnosisRepo.create({
       consultationId: dto.consultationId,
-      clinicalRecordId: dto.clinicalRecordId ?? consultation.clinicalRecordId,
+      clinicalRecordId:
+        dto.clinicalRecordId ?? consultation.clinicalRecordId ?? null,
       doctorId: dto.doctorId ?? consultation.doctorId,
       patientId: dto.patientId ?? consultation.patientId,
-      clinicId: dto.clinicId ?? consultation.clinicId,
-      cie10CodeId: dto.cie10CodeId,
-      diagnosis_details: dto.diagnosis_details,
+      clinicId: cid,
+      cie10CodeId: dto.cie10CodeId ?? null,
+      diagnosis_details: dto.diagnosis_details ?? null,
       diagnostic_date: dto.diagnostic_date
         ? new Date(dto.diagnostic_date)
         : new Date(),
@@ -96,12 +107,32 @@ export class DiagnosisService {
     return { data: saved };
   }
 
-  async update(id: string, dto: UpdateDiagnosisDto) {
+  async update(
+    id: string,
+    dto: UpdateDiagnosisDto,
+    clinicId: string | undefined | null,
+  ) {
+    const cid = requireClinicId(clinicId);
     const diagnosis = await this.diagnosisRepo.findOne({ where: { id } });
     if (!diagnosis) {
       throw new NotFoundException(`Diagnosis with id ${id} not found`);
     }
+    assertClinicMatch(diagnosis.clinicId, cid);
+
+    if (dto.consultationId && dto.consultationId !== diagnosis.consultationId) {
+      const consultation = await this.consultationRepo.findOne({
+        where: { id: dto.consultationId },
+      });
+      if (!consultation) {
+        throw new BadRequestException(
+          `Consultation ${dto.consultationId} not found`,
+        );
+      }
+      assertClinicMatch(consultation.clinicId, cid);
+    }
+
     Object.assign(diagnosis, dto);
+    diagnosis.clinicId = cid;
     if (dto.diagnostic_date) {
       diagnosis.diagnostic_date = new Date(dto.diagnostic_date);
     }
@@ -109,11 +140,13 @@ export class DiagnosisService {
     return { data: saved };
   }
 
-  async remove(id: string) {
+  async remove(id: string, clinicId: string | undefined | null) {
+    const cid = requireClinicId(clinicId);
     const diagnosis = await this.diagnosisRepo.findOne({ where: { id } });
     if (!diagnosis) {
       throw new NotFoundException(`Diagnosis with id ${id} not found`);
     }
+    assertClinicMatch(diagnosis.clinicId, cid);
     await this.diagnosisRepo.remove(diagnosis);
     return { data: diagnosis };
   }
