@@ -11,6 +11,7 @@ export const AuditActions = {
   PAYMENT_CREATE: 'payment.create',
   PAYMENT_WEBHOOK: 'payment.webhook',
   PAYMENT_STATUS_CHECK: 'payment.status_check',
+  PAYMENT_STATUS_UPDATED: 'payment.status_updated',
 } as const;
 
 export type AuditAction = (typeof AuditActions)[keyof typeof AuditActions];

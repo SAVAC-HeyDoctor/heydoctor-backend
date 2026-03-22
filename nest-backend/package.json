@@ -18,7 +18,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "audit:routes": "node scripts/audit-nest-routes.mjs --write --emit-checklist"
+    "audit:routes": "node scripts/audit-nest-routes.mjs --write --emit-checklist",
+    "script:create-admin-temp": "HASH_ONLY=1 npx ts-node -r tsconfig-paths/register scripts/create-admin-user.temp.ts",
+    "script:create-admin-temp:db": "npx ts-node -r tsconfig-paths/register scripts/create-admin-user.temp.ts"
   },
   "overrides": {
     "@nestjs/common": "10.4.22",

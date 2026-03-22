@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -44,17 +45,23 @@ export class PaymentsController {
   }
 
   /**
-   * Público: Payku llama sin JWT. Validación opcional Bearer / firma (ver PaymentsService).
-   * Siempre responde 200 para no provocar reintentos infinitos.
+   * Público (sin JWT). Exige firma HMAC y/o Bearer (producción).
+   * Autenticación inválida → 401. Cuerpo válido → 200 (errores de negocio no exponen 500).
    */
   @Public()
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async webhook(@Req() req: Request, @Body() body: Record<string, unknown>) {
-    await this.paymentsService.handlePaykuWebhook(
-      body && typeof body === 'object' ? body : {},
-      req.headers,
-    );
+    const payload = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+    try {
+      this.paymentsService.assertPaykuWebhookAuthenticated(req.headers, payload);
+    } catch (e) {
+      if (e instanceof UnauthorizedException) {
+        throw e;
+      }
+      throw new UnauthorizedException('Webhook authentication failed');
+    }
+    await this.paymentsService.processPaykuWebhookTrusted(payload, req.headers);
     return { ok: true };
   }
 

@@ -12,7 +12,12 @@ import { Clinic } from './clinic.entity';
 import { Patient } from './patient.entity';
 import { Consultation } from './consultation.entity';
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled';
+export type PaymentStatus =
+  | 'pending'
+  | 'paid'
+  | 'failed'
+  | 'cancelled'
+  | 'expired';
 
 @Entity('payments')
 @Index('IDX_payments_clinic', ['clinicId'])
@@ -59,6 +64,17 @@ export class Payment {
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, unknown> | null;
+
+  /** Último payload completo recibido por webhook (auditoría / disputas). */
+  @Column({ type: 'jsonb', nullable: true })
+  rawResponse: Record<string, unknown> | null;
+
+  /** Identificador de transacción en Payku. */
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  transactionId: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  paidAt: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
