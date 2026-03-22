@@ -8,6 +8,9 @@ export const AuditActions = {
   LAB_ORDER_UPDATE: 'lab_order.update',
   LAB_ORDER_DELETE: 'lab_order.delete',
   AI_INSIGHT_GENERATE: 'ai_insight.generate',
+  PAYMENT_CREATE: 'payment.create',
+  PAYMENT_WEBHOOK: 'payment.webhook',
+  PAYMENT_STATUS_CHECK: 'payment.status_check',
 } as const;
 
 export type AuditAction = (typeof AuditActions)[keyof typeof AuditActions];

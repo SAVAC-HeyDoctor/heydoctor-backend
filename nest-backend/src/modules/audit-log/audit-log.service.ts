@@ -10,11 +10,15 @@ function unwrapResponseData(
 ): Record<string, unknown> | null {
   if (!body || typeof body !== 'object') return null;
   const o = body as Record<string, unknown>;
-  const data = o.data;
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    return data as Record<string, unknown>;
+  if ('data' in o) {
+    const data = o.data;
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      return data as Record<string, unknown>;
+    }
+    return null;
   }
-  return null;
+  /** Respuestas sin envoltorio `data` (p. ej. { paymentId, paymentUrl }). */
+  return o;
 }
 
 function asUuid(value: unknown): string | null {
@@ -108,8 +112,11 @@ export class AuditLogService {
     if (params[ridParam]) {
       resourceId = params[ridParam];
     }
-    if (!resourceId && options.resourceIdFromResponse && data?.id) {
-      resourceId = asUuid(data.id);
+    if (!resourceId && options.resourceIdFromResponse && data) {
+      resourceId =
+        asUuid(data.id) ||
+        asUuid(data.paymentId) ||
+        null;
     }
 
     let consultationId: string | null = null;

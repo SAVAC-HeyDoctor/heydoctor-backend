@@ -12,6 +12,7 @@ import {
   LabOrder,
   Patient,
   Prescription,
+  Payment,
 } from '../../entities';
 import { AuthActor } from '../interfaces/auth-actor.interface';
 import {
@@ -24,7 +25,8 @@ export type OwnershipResource =
   | { type: 'patient'; patientId: string }
   | { type: 'prescription'; entity: Prescription }
   | { type: 'lab_order'; entity: LabOrder }
-  | { type: 'diagnosis'; entity: Diagnosis };
+  | { type: 'diagnosis'; entity: Diagnosis }
+  | { type: 'payment'; entity: Payment };
 
 @Injectable()
 export class AuthorizationService {
@@ -201,6 +203,12 @@ export class AuthorizationService {
         );
         return;
 
+      case 'payment':
+        assertClinicMatch(resource.entity.clinicId, actor.clinicId);
+        if (resource.entity.userId !== actor.userId) {
+          throw new ForbiddenException('Payment belongs to another user');
+        }
+        return;
     }
   }
 }

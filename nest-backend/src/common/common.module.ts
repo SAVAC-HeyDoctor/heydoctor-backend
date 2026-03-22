@@ -5,6 +5,7 @@ import {
   Doctor,
   Patient,
   Consultation,
+  Payment,
 } from '../entities';
 import { OpenAIService } from './services/openai.service';
 import { AuthorizationService } from './services/authorization.service';
@@ -18,6 +19,7 @@ import { ClinicResolverInterceptor } from './interceptors/clinic-resolver.interc
       Doctor,
       Patient,
       Consultation,
+      Payment,
     ]),
   ],
   providers: [OpenAIService, AuthorizationService, ClinicResolverInterceptor],

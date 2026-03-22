@@ -3,7 +3,8 @@ export type AuditResourceType =
   | 'diagnosis'
   | 'prescription'
   | 'lab_order'
-  | 'ai_insight';
+  | 'ai_insight'
+  | 'payment';
 
 /**
  * Metadatos para el interceptor: de dónde sacar IDs (params, body o respuesta).

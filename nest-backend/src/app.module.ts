@@ -28,6 +28,7 @@ import { DiagnosisModule } from './modules/diagnosis/diagnosis.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AiInsightsModule } from './modules/ai-insights/ai-insights.module';
 import { WebrtcModule } from './modules/webrtc/webrtc.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { WebrtcModule } from './modules/webrtc/webrtc.module';
     AnalyticsModule,
     AiInsightsModule,
     WebrtcModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
