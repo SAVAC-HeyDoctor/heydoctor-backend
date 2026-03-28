@@ -1,16 +1,15 @@
 {
   "name": "heydoctor-backend",
   "private": true,
-  "version": "0.1.0",
-  "description": "A Strapi application",
+  "version": "2.0.0",
+  "description": "HeyDoctor Backend (NestJS)",
   "scripts": {
-    "setup": "test -f .env || cp .env.example .env",
-    "migrate:default-clinic": "node scripts/migrateDefaultClinic.js",
-    "develop": "strapi develop",
-    "start": "strapi start",
-    "dev": "strapi develop",
-    "build": "strapi build",
-    "strapi": "strapi"
+    "build": "cd heydoctor-backend-pro && npm ci && rm -rf dist && npm run build",
+    "start": "cd heydoctor-backend-pro && node dist/main",
+    "start:prod": "cd heydoctor-backend-pro && node dist/main",
+    "strapi:start": "strapi start",
+    "strapi:build": "strapi build",
+    "strapi:develop": "strapi develop"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.700.0",
