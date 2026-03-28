@@ -203,10 +203,32 @@ export class ConsultationsService {
       throw new ForbiddenException('Consultation is already signed');
     }
 
+    if (
+      consultation.status !== ConsultationStatus.COMPLETED &&
+      consultation.status !== ConsultationStatus.IN_PROGRESS
+    ) {
+      throw new BadRequestException(
+        `Cannot sign consultation in "${consultation.status}" status`,
+      );
+    }
+
+    const previousStatus = consultation.status;
     consultation.doctorSignature = normalizeSignature(dto.signature);
     consultation.signedAt = new Date();
+    consultation.status = ConsultationStatus.SIGNED;
 
     const saved = await this.consultationsRepository.save(consultation);
+
+    logConsultationStatusChange({
+      auditService: this.auditService,
+      logger: this.logger,
+      authUser,
+      previousStatus,
+      nextStatus: ConsultationStatus.SIGNED,
+      consultationId: saved.id,
+      clinicId: saved.clinicId ?? consultation.clinicId,
+      requestId: getCurrentRequestId(),
+    });
 
     void this.auditService.logSuccess({
       userId: authUser.sub,
@@ -286,6 +308,22 @@ export class ConsultationsService {
 
     if (clinicalDocumentationChanged) {
       this.runAiClinicalSummaryInBackground(saved);
+
+      void this.auditService.logSuccess({
+        userId: authUser.sub,
+        action: 'CONSULTATION_UPDATED',
+        resource: 'consultation',
+        resourceId: saved.id,
+        clinicId: saved.clinicId ?? clinicId,
+        httpStatus: 200,
+        metadata: {
+          fieldsChanged: [
+            saved.notes !== prevNotes ? 'notes' : null,
+            saved.diagnosis !== prevDiagnosis ? 'diagnosis' : null,
+            saved.treatment !== prevTreatment ? 'treatment' : null,
+          ].filter(Boolean),
+        },
+      });
     }
 
     if (

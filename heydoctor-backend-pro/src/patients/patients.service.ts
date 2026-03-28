@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { AuditService } from '../audit/audit.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { Patient } from './patient.entity';
@@ -12,6 +13,7 @@ export class PatientsService {
     @InjectRepository(Patient)
     private readonly patientsRepository: Repository<Patient>,
     private readonly authorizationService: AuthorizationService,
+    private readonly auditService: AuditService,
   ) {}
 
   async findAll(authUser: AuthenticatedUser): Promise<Patient[]> {
@@ -43,6 +45,18 @@ export class PatientsService {
       email,
       clinic: { id: clinicId },
     });
-    return this.patientsRepository.save(entity);
+    const saved = await this.patientsRepository.save(entity);
+
+    void this.auditService.logSuccess({
+      userId: authUser.sub,
+      action: 'PATIENT_CREATED',
+      resource: 'patient',
+      resourceId: saved.id,
+      clinicId,
+      httpStatus: 201,
+      metadata: { email: saved.email },
+    });
+
+    return saved;
   }
 }
