@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import cookieParser from 'cookie-parser';
 import { AuditInterceptor } from './audit/audit.interceptor';
 import { AuditService } from './audit/audit.service';
 import { AuthorizationService } from './authorization/authorization.service';
@@ -17,6 +18,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   console.log('>>> NestFactory.create DONE');
 
+  app.use(cookieParser());
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.useWebSocketAdapter(new IoAdapter(app));
   app.useGlobalGuards(app.get(ThrottlerGuard));
   app.use(new RequestIdMiddleware().use);

@@ -1,7 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { createHash, randomBytes } from 'crypto';
+import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { AuditLog } from '../audit/audit-log.entity';
+import { AuditOutcome } from '../audit/audit-outcome.enum';
 import {
   Subscription,
   SubscriptionPlan,
@@ -9,9 +12,27 @@ import {
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.enum';
 import { UsersService } from '../users/users.service';
+import { RefreshToken } from './entities/refresh-token.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './types/jwt-payload.interface';
+
+const REFRESH_TOKEN_DAYS = 7;
+const MAX_ACTIVE_SESSIONS = 5;
+
+function generateRawToken(): string {
+  return randomBytes(32).toString('hex');
+}
+
+function hashToken(raw: string): string {
+  return createHash('sha256').update(raw).digest('hex');
+}
+
+/** Metadata extracted from the HTTP request by the controller. */
+export type RequestContext = {
+  ip: string | null;
+  userAgent: string | null;
+};
 
 export type AuthUserView = {
   id: string;
@@ -34,7 +55,13 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @InjectRepository(Subscription)
     private readonly subscriptionRepository: Repository<Subscription>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepository: Repository<RefreshToken>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepository: Repository<AuditLog>,
   ) {}
+
+  // ── Public Auth flows ─────────────────────────────────────────
 
   async register(dto: RegisterDto) {
     const user = await this.usersService.create(
@@ -45,14 +72,20 @@ export class AuthService {
     return this.buildAuthResponse(user);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, ctx: RequestContext) {
     const user = await this.usersService.validateCredentials(
       dto.email,
       dto.password,
     );
     if (!user) {
+      await this.logSecurityEvent('AUTH_LOGIN_FAILED', null, ctx, {
+        email: dto.email,
+        reason: 'invalid_credentials',
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    await this.logSecurityEvent('AUTH_LOGIN_SUCCESS', user.id, ctx);
     return this.buildAuthResponse(user);
   }
 
@@ -64,11 +97,174 @@ export class AuthService {
       role: publicUser.role,
     };
     const access_token = await this.jwtService.signAsync(payload);
-    return {
-      access_token,
-      user: publicUser,
-    };
+    return { access_token, user: publicUser };
   }
+
+  // ── Refresh Token Management ──────────────────────────────────
+
+  async createRefreshToken(
+    userId: string,
+    ctx: RequestContext,
+  ): Promise<string> {
+    await this.enforceSessionLimit(userId);
+
+    const raw = generateRawToken();
+    const tokenHash = hashToken(raw);
+    const expiresAt = new Date(
+      Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    const entity = this.refreshTokenRepository.create({
+      tokenHash,
+      userId,
+      expiresAt,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent ? ctx.userAgent.slice(0, 512) : null,
+    });
+    await this.refreshTokenRepository.save(entity);
+
+    return raw;
+  }
+
+  async validateAndRotateRefreshToken(
+    rawToken: string,
+    ctx: RequestContext,
+  ): Promise<{ accessToken: string; newRefreshToken: string }> {
+    const tokenHash = hashToken(rawToken);
+
+    const stored = await this.refreshTokenRepository.findOne({
+      where: { tokenHash },
+    });
+
+    if (!stored) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    // ── Reuse detection: revoked token used again → full revocation ──
+    if (stored.revokedAt) {
+      await this.revokeAllUserTokens(stored.userId);
+      await this.logSecurityEvent(
+        'TOKEN_REUSE_DETECTED',
+        stored.userId,
+        ctx,
+        {
+          tokenId: stored.id,
+          originalRevokedAt: stored.revokedAt.toISOString(),
+          severity: 'critical',
+        },
+      );
+      throw new UnauthorizedException('Refresh token reuse detected');
+    }
+
+    if (stored.expiresAt < new Date()) {
+      throw new UnauthorizedException('Refresh token expired');
+    }
+
+    // Revoke current token (rotation)
+    stored.revokedAt = new Date();
+    stored.lastUsedAt = new Date();
+    await this.refreshTokenRepository.save(stored);
+
+    const user = await this.usersService.findById(stored.userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+    const accessToken = await this.jwtService.signAsync(payload);
+    const newRefreshToken = await this.createRefreshToken(user.id, ctx);
+
+    await this.logSecurityEvent('AUTH_REFRESH_SUCCESS', user.id, ctx, {
+      previousTokenId: stored.id,
+    });
+
+    return { accessToken, newRefreshToken };
+  }
+
+  async revokeRefreshToken(rawToken: string): Promise<void> {
+    const tokenHash = hashToken(rawToken);
+    const stored = await this.refreshTokenRepository.findOne({
+      where: { tokenHash },
+    });
+    if (stored && !stored.revokedAt) {
+      stored.revokedAt = new Date();
+      await this.refreshTokenRepository.save(stored);
+    }
+  }
+
+  async revokeAllUserTokens(userId: string): Promise<void> {
+    await this.refreshTokenRepository.update(
+      { userId, revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
+  }
+
+  // ── Session limit enforcement ─────────────────────────────────
+
+  private async enforceSessionLimit(userId: string): Promise<void> {
+    const active = await this.refreshTokenRepository.find({
+      where: {
+        userId,
+        revokedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (active.length >= MAX_ACTIVE_SESSIONS) {
+      const toRevoke = active.slice(MAX_ACTIVE_SESSIONS - 1);
+      const now = new Date();
+      for (const token of toRevoke) {
+        token.revokedAt = now;
+      }
+      await this.refreshTokenRepository.save(toRevoke);
+    }
+
+    // Garbage-collect expired+revoked tokens older than 1 day
+    await this.refreshTokenRepository
+      .createQueryBuilder()
+      .delete()
+      .where('expires_at < :cutoff', {
+        cutoff: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      })
+      .andWhere('revoked_at IS NOT NULL')
+      .execute();
+  }
+
+  // ── Security audit logging ────────────────────────────────────
+
+  private async logSecurityEvent(
+    action: string,
+    userId: string | null,
+    ctx: RequestContext,
+    extra?: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const row = this.auditLogRepository.create({
+        userId,
+        action,
+        resource: 'auth',
+        status: action.includes('FAIL') || action.includes('REUSE')
+          ? AuditOutcome.ERROR
+          : AuditOutcome.SUCCESS,
+        httpStatus: action.includes('FAIL') ? 401 : 200,
+        metadata: {
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+          ...extra,
+        },
+      });
+      await this.auditLogRepository.save(row);
+    } catch {
+      // Audit must never block auth flow
+    }
+  }
+
+  // ── /auth/me ──────────────────────────────────────────────────
 
   async getMe(userId: string): Promise<MeResponse> {
     const user = await this.usersService.findById(userId);
