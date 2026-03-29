@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AiModule } from './ai/ai.module';
 import { AuditModule } from './audit/audit.module';
+import { LoggerModule } from './common/logger/logger.module';
 import { AuthModule } from './auth/auth.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { ComplianceModule } from './compliance/compliance.module';
@@ -41,6 +42,7 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    LoggerModule,
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({
       throttlers: [

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
+import { LoggerModule } from '../common/logger/logger.module';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { TelemedicineConsent } from '../consents/consent.entity';
 import { Consultation } from '../consultations/consultation.entity';
@@ -23,6 +24,7 @@ import { GdprService } from './gdpr.service';
     ]),
     AuthModule,
     AuditModule,
+    LoggerModule,
   ],
   controllers: [GdprController],
   providers: [GdprService],
