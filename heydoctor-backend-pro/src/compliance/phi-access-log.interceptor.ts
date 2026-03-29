@@ -35,6 +35,10 @@ const PHI_ACCESS_PATTERNS = [
 
 @Injectable()
 export class PhiAccessLogInterceptor implements NestInterceptor {
+  /**
+   * Nest may still print "AppLoggerService" in UnknownDependenciesException for
+   * index [2] because of emitDecoratorMetadata — the runtime token is APP_LOGGER.
+   */
   constructor(
     @Inject(COMPLIANCE_CONFIG_TOKEN)
     private readonly config: ComplianceConfig,
